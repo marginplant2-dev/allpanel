@@ -39,8 +39,8 @@ IST = timezone(timedelta(hours=5, minutes=30))
 #: actually sees first are fetched — in-play, then soonest — and the calls run
 #: concurrently behind a small semaphore so one refresh is ~1s, not ~30s.
 #: ponytail: if the board ever pages beyond this, enrich per page instead.
-MAX_ENRICHED = 30
-ENRICH_CONCURRENCY = 8
+MAX_ENRICHED = 14
+ENRICH_CONCURRENCY = 6
 
 #: sport key -> (list path, list container key, odds path, display name, group)
 SPORTS: dict[str, tuple[str, str, str, str, str]] = {
@@ -72,6 +72,26 @@ ODDS_TTL = 5.0
 SCORE_TTL = 10.0
 
 _cache: dict[str, tuple[float, Any]] = {}
+
+#: One client for the whole process. A fresh AsyncClient per call means a fresh TLS
+#: handshake per call, and a board refresh makes dozens — that is what was tipping
+#: requests past the timeout and dropping the board onto seeded data.
+_client: httpx.AsyncClient | None = None
+
+
+def _http() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        headers = {"Accept": "application/json"}
+        if settings.proexch_origin:
+            headers["Origin"] = settings.proexch_origin
+            headers["Referer"] = settings.proexch_origin.rstrip("/") + "/"
+        _client = httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0, connect=5.0),
+            headers=headers,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+    return _client
 
 
 def cached(key: str, ttl: float, factory):
@@ -308,14 +328,9 @@ class ProexchProvider(BaseSportsProvider):
         self.db = db  # unused; kept to match the provider interface
 
     async def _get(self, path: str, **params: Any) -> dict[str, Any]:
-        headers = {"Accept": "application/json"}
-        if settings.proexch_origin:
-            headers["Origin"] = settings.proexch_origin
-            headers["Referer"] = settings.proexch_origin.rstrip("/") + "/"
-        async with httpx.AsyncClient(timeout=20.0, headers=headers) as client:
-            r = await client.get(settings.proexch_base_url + path, params=params or None)
-            r.raise_for_status()
-            body = r.json()
+        r = await _http().get(settings.proexch_base_url + path, params=params or None)
+        r.raise_for_status()
+        body = r.json()
         return body.get("data") if isinstance(body, dict) else {}
 
     async def get_sports(self) -> list[dict[str, Any]]:
@@ -383,7 +398,14 @@ class ProexchProvider(BaseSportsProvider):
                 for o in outcomes
             ]
 
-        await asyncio.gather(*(one(e) for e in ranked[:MAX_ENRICHED]))
+        try:
+            # prices are a bonus on the list; a slow feed must not cost us the board
+            await asyncio.wait_for(
+                asyncio.gather(*(one(e) for e in ranked[:MAX_ENRICHED]), return_exceptions=True),
+                timeout=12.0,
+            )
+        except (asyncio.TimeoutError, Exception) as exc:  # noqa: BLE001
+            logger.info("proexch enrichment cut short for %s: %s", sport, exc or type(exc).__name__)
 
     async def get_events(
         self, *, sport_id: str | None = None, status: str | None = None
