@@ -19,6 +19,8 @@ Times carry no zone and are IST (verified against Europa League kick-offs).
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -28,7 +30,17 @@ import httpx
 from app.core.config import settings
 from app.modules.providers.base import BaseSportsProvider
 
+logger = logging.getLogger(__name__)
+
 IST = timezone(timedelta(hours=5, minutes=30))
+
+#: The match lists carry no prices (every back1/lay1 comes through as 0), so the
+#: board is filled from the per-event odds endpoint. Only the matches a visitor
+#: actually sees first are fetched — in-play, then soonest — and the calls run
+#: concurrently behind a small semaphore so one refresh is ~1s, not ~30s.
+#: ponytail: if the board ever pages beyond this, enrich per page instead.
+MAX_ENRICHED = 30
+ENRICH_CONCURRENCY = 8
 
 #: sport key -> (list path, list container key, odds path, display name, group)
 SPORTS: dict[str, tuple[str, str, str, str, str]] = {
@@ -219,9 +231,45 @@ class ProexchProvider(BaseSportsProvider):
             rows = data.get(container)
             if rows is None:  # container renamed upstream: take the first list we find
                 rows = next((v for v in data.values() if isinstance(v, list)), [])
-            return [e for e in (map_event(sport, r) for r in rows) if e]
+            events = [e for e in (map_event(sport, r) for r in rows) if e]
+            await self._enrich(sport, events)
+            return events
 
         return await cached(f"matches:{sport}", MATCHES_TTL, fetch)
+
+    async def _enrich(self, sport: str, events: list[dict[str, Any]]) -> None:
+        """Fill in 1/X/2 prices for the events at the top of the board."""
+        ranked = sorted(events, key=lambda e: (e["status"] != "live", e["start_time"] or ""))
+        gate = asyncio.Semaphore(ENRICH_CONCURRENCY)
+
+        async def one(event: dict[str, Any]) -> None:
+            _, game_id, market_id = event["id"].split(":")
+
+            async def fetch() -> dict[str, Any]:
+                async with gate:
+                    return await self._get(SPORTS[sport][2], gameId=game_id, marketId=market_id)
+
+            try:
+                payload = await cached(f"odds:{event['id']}", ODDS_TTL, fetch)
+            except Exception as exc:  # noqa: BLE001 — a priceless row is better than no board
+                logger.debug("proexch odds failed for %s: %s", event["id"], exc)
+                return
+            books = map_bookmakers(payload or {})
+            if not books:
+                return
+            outcomes = books[0]["markets"][0]["outcomes"]
+            event["odds"] = [
+                {
+                    "name": o["name"],
+                    "price": o["price"],
+                    "lay": o.get("lay"),
+                    "bookmaker_key": books[0]["key"],
+                    "bookmaker_title": books[0]["title"],
+                }
+                for o in outcomes
+            ]
+
+        await asyncio.gather(*(one(e) for e in ranked[:MAX_ENRICHED]))
 
     async def get_events(
         self, *, sport_id: str | None = None, status: str | None = None
