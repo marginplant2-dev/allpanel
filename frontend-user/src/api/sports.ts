@@ -15,6 +15,7 @@ export interface LiveData {
   event_id: string;
   status: string;
   score: Record<string, number>;
+  board?: import("@/types").LiveBoard;
 }
 
 export function fetchSports() {

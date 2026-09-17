@@ -62,12 +62,23 @@ export interface SportEvent {
   odds?: EventOdds[];
 }
 
+/** One rung of the price ladder: a price and the money available at it. */
+export interface PriceLevel {
+  price: number | null;
+  size?: string | number | null;
+}
+
 export interface OddsOutcome {
   name: string;
   price: number;
   lay?: number | null;
+  /** Three back / lay levels, best first — what an exchange board shows. */
+  back_ladder?: PriceLevel[];
+  lay_ladder?: PriceLevel[];
   status?: string | null;
   size?: string | number | null;
+  min_stake?: number;
+  max_stake?: number;
   point?: number;
 }
 
@@ -79,6 +90,11 @@ export interface OddsMarket {
 export interface Bookmaker {
   key: string;
   title: string;
+  /** match_odds | bookmaker | fancy | other */
+  kind?: string;
+  /** Fancy family: normal, over by over, ball by ball, oddeven, meter, fancy1… */
+  gtype?: string | null;
+  status_text?: string | null;
   last_update?: string;
   /** Feed says the market is not taking bets right now. */
   suspended?: boolean;
@@ -125,4 +141,23 @@ export interface PageMeta {
 export interface Paginated<T> {
   items: T[];
   meta: PageMeta;
+}
+
+export interface LiveBoardTeam {
+  name?: string | null;
+  short: string;
+  score?: string | null;
+  flag?: string | null;
+}
+
+/** The live scoreboard the exchange shows above the markets. */
+export interface LiveBoard {
+  inning?: string | null;
+  team1: LiveBoardTeam;
+  team2: LiveBoardTeam;
+  crr?: string | null;
+  rrr?: string | null;
+  target?: string | null;
+  last6: string[];
+  message?: string | null;
 }

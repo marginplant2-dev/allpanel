@@ -1,116 +1,33 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchEvent, fetchLiveData } from "@/api/sports";
-import type { Bookmaker, EventDetail } from "@/types";
+import type { Bookmaker, EventDetail, OddsOutcome } from "@/types";
 import { ErrorState } from "@/components/common/States";
 import { BetSlip, type BetSelection } from "@/components/bets/BetSlip";
 import { MyBets } from "@/components/bets/MyBets";
-import { layPrice } from "@/components/exchange/OddsGrid";
+import { FancySection, MatchOddsBoard, toSelection } from "@/components/exchange/MarketBoard";
+import { ScoreStrip } from "@/components/exchange/ScoreStrip";
 import { useAuthStore } from "@/store/auth";
-import { cn, formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 
-interface Runner {
-  name: string;
-  price: number;
-  lay: number | null;
-  bookmakerKey: string;
-  bookmakerTitle: string;
-}
+/** Section headings, in the order the exchanges list them. */
+const FANCY_TITLES: Record<string, string> = {
+  normal: "Normal",
+  "over by over": "Over By Over",
+  overbyover: "Over By Over",
+  "ball by ball": "Ball By Ball",
+  ballbyball: "Ball By Ball",
+  oddeven: "Odd Even",
+  meter: "Meter",
+  fancy1: "Fancy1",
+  khadometer: "Khado Meter",
+};
+const FANCY_ORDER = ["Normal", "Over By Over", "Ball By Ball", "Fancy1", "Odd Even", "Meter"];
 
-/** Best h2h price per runner across books — the headline "Match Odds" market. */
-function bestRunners(bookmakers: Bookmaker[]): Runner[] {
-  const best = new Map<string, Runner>();
-  for (const b of bookmakers) {
-    for (const m of b.markets) {
-      if (m.key !== "h2h") continue;
-      for (const o of m.outcomes) {
-        const current = best.get(o.name);
-        if (!current || o.price > current.price) {
-          best.set(o.name, {
-            name: o.name,
-            price: o.price,
-            lay: o.lay ?? null,
-            bookmakerKey: b.key,
-            bookmakerTitle: b.title,
-          });
-        }
-      }
-    }
-  }
-  return [...best.values()];
-}
-
-function bookmakerRunners(b: Bookmaker): Runner[] {
-  const market = b.markets.find((m) => m.key === "h2h");
-  return (market?.outcomes ?? []).map((o) => ({
-    name: o.name,
-    price: o.price,
-    lay: o.lay ?? null,
-    bookmakerKey: b.key,
-    bookmakerTitle: b.title,
-  }));
-}
-
-const ROW = "grid-cols-[1fr_58px_58px_46px] sm:grid-cols-[1fr_84px_84px_58px]";
-
-function MarketBox({
-  title,
-  runners,
-  suspended,
-  selected,
-  onSelect,
-}: {
-  title: string;
-  runners: Runner[];
-  suspended: boolean;
-  selected?: string;
-  onSelect: (runner: Runner) => void;
-}) {
-  if (runners.length === 0) return null;
-  return (
-    <section className="border border-ex-line bg-white">
-      <div className="bg-ex-nav px-3 py-1.5">
-        <h2 className="truncate text-[13px] font-bold uppercase text-white">{title}</h2>
-      </div>
-
-      <div className={cn("ex-head grid items-center border-b border-ex-line", ROW)}>
-        <span className="px-2 py-1.5">Runner</span>
-        <span className="grid place-items-center border-l border-ex-line py-1.5">Back</span>
-        <span className="grid place-items-center border-l border-ex-line py-1.5">Lay</span>
-        <span className="grid place-items-center border-l border-ex-line py-1.5">Limit</span>
-      </div>
-
-      {runners.map((r) => (
-        <div key={r.name} className={cn("relative grid items-center border-b border-ex-line", ROW)}>
-          <span className="truncate px-2 py-2 text-[13px] font-semibold text-slate-800">{r.name}</span>
-          <button
-            type="button"
-            disabled={suspended}
-            onClick={() => onSelect(r)}
-            className={cn(
-              "ex-cell h-10 bg-ex-back",
-              !suspended && "cursor-pointer hover:brightness-105",
-              selected === r.name && "ring-2 ring-inset ring-ex-brand",
-            )}
-          >
-            {r.price.toFixed(2)}
-          </button>
-          {/* lay is display-only — see the LAY_SPREAD note in OddsGrid */}
-          <span className="ex-cell h-10 bg-ex-lay">{(r.lay ?? layPrice(r.price)).toFixed(2)}</span>
-          <span className="grid h-10 place-items-center border-l border-ex-line text-[10px] leading-tight text-slate-500">
-            <span>Min 100</span>
-            <span>Max 50K</span>
-          </span>
-          {suspended && (
-            <span className="absolute inset-y-0 right-0 grid w-[162px] place-items-center bg-ex-suspend text-[11px] font-bold uppercase tracking-wide text-white sm:w-[226px]">
-              Suspended
-            </span>
-          )}
-        </div>
-      ))}
-    </section>
-  );
+function rank(title: string) {
+  const i = FANCY_ORDER.indexOf(title);
+  return i < 0 ? 99 : i;
 }
 
 export default function EventDetailPage() {
@@ -119,37 +36,48 @@ export default function EventDetailPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [selection, setSelection] = useState<BetSelection | null>(null);
 
-  const event = useQuery({ queryKey: ["event", eventId], queryFn: () => fetchEvent(eventId), refetchInterval: 30_000 });
+  const event = useQuery({
+    queryKey: ["event", eventId],
+    queryFn: () => fetchEvent(eventId),
+    // an in-play board moves constantly; this is the cadence the books run at
+    refetchInterval: 5_000,
+  });
   const live = useQuery({
     queryKey: ["event-live", eventId],
     queryFn: () => fetchLiveData(eventId),
     enabled: event.data?.status === "live",
-    refetchInterval: 10_000,
+    refetchInterval: 8_000,
+    retry: false,
   });
 
-  if (event.isLoading) {
-    return <div className="h-64 animate-pulse border border-ex-line bg-white" />;
-  }
-  if (event.isError || !event.data) return <ErrorState onRetry={() => event.refetch()} />;
+  const e = event.data as EventDetail | undefined;
+  const books = useMemo(() => e?.bookmakers ?? [], [e]);
+  const matchBooks = useMemo(
+    () => books.filter((b) => b.kind !== "fancy" && b.kind !== "other"),
+    [books],
+  );
+  const fancyGroups = useMemo(() => {
+    const groups = new Map<string, Bookmaker[]>();
+    for (const b of books) {
+      if (b.kind !== "fancy" && b.kind !== "other") continue;
+      const title = FANCY_TITLES[(b.gtype ?? "").toLowerCase()] ?? b.gtype ?? "Fancy";
+      groups.set(title, [...(groups.get(title) ?? []), b]);
+    }
+    return [...groups.entries()].sort((a, b) => rank(a[0]) - rank(b[0]));
+  }, [books]);
 
-  const e: EventDetail = event.data;
-  const score = (live.data?.score ?? e.score ?? {}) as Record<string, number>;
+  if (event.isLoading) return <div className="h-64 animate-pulse border border-ex-line bg-white" />;
+  if (event.isError || !e) return <ErrorState onRetry={() => event.refetch()} />;
+
   const isLive = (live.data?.status ?? e.status) === "live";
-  const bookmakers = e.bookmakers ?? [];
+  const board = live.data?.board;
 
-  function select(runner: Runner) {
+  function select(outcome: OddsOutcome, book: Bookmaker) {
     if (!isAuthenticated) {
       navigate("/login");
       return;
     }
-    setSelection({
-      eventId: e.id,
-      eventName: e.name,
-      bookmakerKey: runner.bookmakerKey,
-      bookmakerTitle: runner.bookmakerTitle,
-      outcomeName: runner.name,
-      price: runner.price,
-    });
+    setSelection(toSelection({ id: e!.id, name: e!.name }, outcome, book));
   }
 
   return (
@@ -166,41 +94,40 @@ export default function EventDetailPage() {
               )}
             </span>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-ex-line">
-            {e.participants.map((p) => (
-              <div key={p} className="flex items-center justify-between gap-2 px-3 py-2">
-                <span className="truncate text-[13px] font-semibold text-slate-800">{p}</span>
-                <span className="text-lg font-bold text-ex-brand">{isLive ? score[p] ?? 0 : "-"}</span>
-              </div>
-            ))}
-          </div>
+
+          {board ? (
+            <ScoreStrip board={board} />
+          ) : (
+            <div className="grid grid-cols-2 divide-x divide-ex-line">
+              {e.participants.map((p) => (
+                <div key={p} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <span className="truncate text-[13px] font-semibold text-slate-800">{p}</span>
+                  <span className="text-lg font-bold text-ex-brand">-</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {bookmakers.length === 0 ? (
+        {books.length === 0 ? (
           <p className="border border-ex-line bg-white px-3 py-10 text-center text-sm text-slate-500">
-            No prices published for this event yet.
+            No markets open for this event right now.
           </p>
         ) : (
-          <div className="grid gap-2 lg:grid-cols-2">
-            <MarketBox
-              title="Match Odds"
-              runners={bestRunners(bookmakers)}
-              suspended={isLive || (bookmakers[0]?.suspended ?? false)}
-              selected={selection?.outcomeName}
-              onSelect={select}
-            />
-            {/* one market only: it is already the "Match Odds" box, so don't repeat it */}
-            {(bookmakers.length > 1 ? bookmakers : []).map((b) => (
-              <MarketBox
+          <>
+            {matchBooks.map((b) => (
+              <MatchOddsBoard
                 key={b.key}
-                title={b.title}
-                runners={bookmakerRunners(b)}
-                suspended={isLive || (b.suspended ?? false)}
+                book={b}
+                suspended={false}
                 selected={selection?.outcomeName}
                 onSelect={select}
               />
             ))}
-          </div>
+            {fancyGroups.map(([title, group]) => (
+              <FancySection key={title} title={title} books={group} />
+            ))}
+          </>
         )}
       </div>
 
@@ -209,7 +136,6 @@ export default function EventDetailPage() {
           <BetSlip
             selection={selection}
             onClose={() => setSelection(null)}
-            // desktop: right rail. mobile: sheet above the bottom nav.
             className="fixed inset-x-0 bottom-14 z-50 xl:static xl:bottom-auto"
           />
         )}

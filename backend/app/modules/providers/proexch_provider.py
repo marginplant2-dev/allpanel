@@ -155,42 +155,135 @@ def map_event(sport: str, row: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def map_bookmakers(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every market in the odds payload becomes one 'bookmaker' block.
+def ladder(odd: dict[str, Any], side: str) -> list[dict[str, Any]]:
+    """The three price levels an exchange shows per side, best first.
 
-    The app renders one box per block, which is exactly how an exchange board
-    looks: Match Odds, Bookmaker, then a box per fancy market.
+    `b1/bs1 … b3/bs3` for back, `l1/ls1 … l3/ls3` for lay — price with the money
+    available at it.
+    """
+    out = []
+    for i in (1, 2, 3):
+        value = price(odd.get(f"{side}{i}"))
+        out.append({"price": value or None, "size": odd.get(f"{side}s{i}") or None})
+    return out
+
+
+def map_bookmakers(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every market in the odds payload becomes one board section.
+
+    `gtype` separates the fancy families the exchanges show under their own
+    headings (normal, over by over, ball by ball, oddeven, meter, fancy1), so it
+    travels with the section.
     """
     books: list[dict[str, Any]] = []
     for group_key, prefix, fallback_title in MARKET_GROUPS:
         for market in payload.get(group_key) or []:
             outcomes = []
             for odd in market.get("oddDatas") or []:
-                back, lay = price(odd.get("b1")), price(odd.get("l1"))
-                if not back and not lay:
+                back, lay = ladder(odd, "b"), ladder(odd, "l")
+                status = str(odd.get("status") or "").strip()
+                if not back[0]["price"] and not lay[0]["price"] and not status:
                     continue
                 outcomes.append(
                     {
                         "name": odd.get("rname") or str(odd.get("sid")),
-                        "price": back or lay,
-                        "lay": lay or None,
-                        "status": odd.get("status"),
-                        "size": odd.get("bs1"),
+                        "price": back[0]["price"] or lay[0]["price"] or 0.0,
+                        "lay": lay[0]["price"],
+                        "back_ladder": back,
+                        "lay_ladder": lay,
+                        "status": status or None,
+                        "min_stake": odd.get("min") or market.get("min") or 0,
+                        "max_stake": odd.get("max") or market.get("max") or 0,
+                        "size": back[0]["size"],
                     }
                 )
             if not outcomes:
                 continue
+            group = str(market.get("gtype") or "").strip().lower()
             books.append(
                 {
                     "key": f"{prefix}:{market.get('mid') or len(books)}",
                     "title": market.get("mname") or market.get("market") or fallback_title,
+                    "kind": prefix,
+                    "gtype": group or None,
                     "suspended": str(market.get("mstatus") or "").upper() not in ("", "OPEN"),
+                    "status_text": market.get("mstatus"),
                     "min_stake": market.get("min") or 0,
                     "max_stake": market.get("max") or 0,
                     "markets": [{"key": "h2h", "outcomes": outcomes}],
                 }
             )
     return books
+
+
+def map_score(event_id: str, row: dict[str, Any]) -> dict[str, Any]:
+    """The live strip an exchange shows above the markets.
+
+    `score` keeps the flat team -> runs shape the settlement worker reads; `board`
+    carries what the scoreboard renders (overs, run rates, the last six balls).
+    """
+    def short(n: int) -> str:
+        return str(row.get(f"Team{n}Name_Short") or row.get(f"Team{n}Name") or f"Team {n}")
+
+    def runs(n: int) -> float | None:
+        text = str(row.get(f"Team{n}ScoreOnly") or "").split("-")[0]
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
+    score = {}
+    for n in (1, 2):
+        value = runs(n)
+        if value is not None:
+            score[short(n)] = value
+
+    last6 = [b for b in (row.get("Last6Balls") or []) if str(b).strip()]
+    return {
+        "event_id": event_id,
+        "status": "live",
+        "score": score,
+        "board": {
+            "inning": row.get("CurrentInning"),
+            "team1": {
+                "name": row.get("Team1Name"),
+                "short": short(1),
+                "score": row.get("Team1OnlyScore"),
+                "flag": row.get("Team1Flag"),
+            },
+            "team2": {
+                "name": row.get("Team2Name"),
+                "short": short(2),
+                "score": row.get("Team2OnlyScore"),
+                "flag": row.get("Team2Flag"),
+            },
+            "crr": row.get("CRR"),
+            "rrr": row.get("RRR"),
+            "target": row.get("Target"),
+            "last6": last6,
+            "message": _chase_message(row),
+        },
+    }
+
+
+def _chase_message(row: dict[str, Any]) -> str | None:
+    """"AFG need 165 runs from 78 balls" — the feed sends the parts, not the line."""
+    try:
+        target = int(str(row.get("Target") or "").strip())
+        scored, _, rest = str(row.get("Team1ScoreOnly") or "").partition("-")
+        scored = int(scored)
+        overs = float(str(row.get("Team1Overs") or 0))
+    except (TypeError, ValueError):
+        return None
+    if not target:
+        return None
+    whole, part = divmod(round(overs * 10), 10)
+    balls_left = 20 * 6 - (whole * 6 + part)
+    need = target - scored
+    if need <= 0 or balls_left <= 0:
+        return None
+    side = row.get("Team1Name_Short") or row.get("Team1Name") or "Chasing side"
+    return f"{side} need {need} runs from {balls_left} balls"
 
 
 class ProexchProvider(BaseSportsProvider):
@@ -315,22 +408,16 @@ class ProexchProvider(BaseSportsProvider):
         parts = event_id.split(":")
         if len(parts) != 3:
             return None
-        sport, game_id, _ = parts
+        _, game_id, _ = parts
 
         async def fetch() -> dict[str, Any]:
             return await self._get(f"/api/score3/{game_id}")
 
         payload = await cached(f"score:{event_id}", SCORE_TTL, fetch) or {}
-        inner = payload.get("data") if isinstance(payload.get("data"), dict) else payload
-        if not inner:
+        rows = ((payload.get("Data") or {}).get("Score")) if isinstance(payload.get("Data"), dict) else None
+        if not rows:
             return None
-        score = {}
-        for team_key, run_key in (("team1", "score1"), ("team2", "score2")):
-            if inner.get(team_key):
-                score[str(inner[team_key])] = inner.get(run_key)
-        if not score:
-            return None
-        return {"event_id": event_id, "status": "live", "score": score}
+        return map_score(event_id, rows[0])
 
     async def get_result(self, sport: str, market_id: str, type_: str = "match") -> dict[str, Any] | None:
         """Settled result for a market.
