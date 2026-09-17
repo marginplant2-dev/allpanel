@@ -55,7 +55,9 @@ async def seed() -> None:
         "username": settings.superadmin_username,
         "password_hash": hash_password(settings.superadmin_password),
         "full_name": settings.superadmin_fullname,
-        "role": Role.SUPER_ADMIN.value,
+        # Top of the chain. A SUPER_ADMIN here would leave the tree headless:
+        # self-registered players look for the MOTHER_ADMIN to attach to.
+        "role": Role.MOTHER_ADMIN.value,
         "parent_id": None,
         "hierarchy_path": [],
         "status": UserStatus.ACTIVE.value,
