@@ -251,6 +251,21 @@ def map_bookmakers(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return books
 
 
+def winner_from(books: list[dict[str, Any]]) -> str | None:
+    """A settled market marks its runners WINNER / LOSER — that is the result.
+
+    The scores endpoint drops a match as soon as it ends and `betfair-result` only
+    answers for fancy ids, so this is the only place the match-odds result shows up.
+    """
+    for book in books:
+        if book.get("kind") not in ("match_odds", "bookmaker"):
+            continue
+        for outcome in book["markets"][0]["outcomes"]:
+            if str(outcome.get("status") or "").upper() == "WINNER":
+                return outcome["name"]
+    return None
+
+
 def map_score(event_id: str, row: dict[str, Any]) -> dict[str, Any]:
     """The live strip an exchange shows above the markets.
 
@@ -386,6 +401,12 @@ class ProexchProvider(BaseSportsProvider):
             )
             if book is None:
                 return
+            winner = winner_from(books)
+            if winner:
+                # settled: no prices to show, and it should not head the board
+                event["status"] = "finished"
+                event["winner"] = winner
+                return
             outcomes = book["markets"][0]["outcomes"]
             event["odds"] = [
                 {
@@ -416,7 +437,14 @@ class ProexchProvider(BaseSportsProvider):
             events.extend(await self._matches(sport))
         # Priced markets first: a board that opens on a wall of dashes looks broken,
         # and a match with no price is one you cannot bet on anyway.
-        events.sort(key=lambda e: (not e.get("odds"), e["status"] != "live", e["start_time"] or ""))
+        events.sort(
+            key=lambda e: (
+                e["status"] == "finished",
+                not e.get("odds"),
+                e["status"] != "live",
+                e["start_time"] or "",
+            )
+        )
         if status:
             return [e for e in events if e["status"] == status]
         return events
@@ -439,6 +467,10 @@ class ProexchProvider(BaseSportsProvider):
             return None
         detail = dict(base or {"id": event_id, "sport_id": sport, "participants": []})
         detail["bookmakers"] = books
+        winner = winner_from(books)
+        if winner:
+            detail["status"] = "finished"
+            detail["winner"] = winner
         return detail
 
     async def get_live_data(self, event_id: str) -> dict[str, Any] | None:
@@ -452,9 +484,16 @@ class ProexchProvider(BaseSportsProvider):
 
         payload = await cached(f"score:{event_id}", SCORE_TTL, fetch) or {}
         rows = ((payload.get("Data") or {}).get("Score")) if isinstance(payload.get("Data"), dict) else None
-        if not rows:
-            return None
-        return map_score(event_id, rows[0])
+        if rows:
+            return map_score(event_id, rows[0])
+
+        # No score: the match may simply be over. A settled market names the winner,
+        # which is what settlement needs.
+        detail = await self.get_event_detail(event_id)
+        winner = winner_from((detail or {}).get("bookmakers") or [])
+        if winner:
+            return {"event_id": event_id, "status": "finished", "winner": winner, "score": {}}
+        return None
 
     async def get_result(self, sport: str, market_id: str, type_: str = "match") -> dict[str, Any] | None:
         """Settled result for a market.

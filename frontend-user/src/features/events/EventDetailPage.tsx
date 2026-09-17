@@ -39,8 +39,9 @@ export default function EventDetailPage() {
   const event = useQuery({
     queryKey: ["event", eventId],
     queryFn: () => fetchEvent(eventId),
-    // an in-play board moves constantly; this is the cadence the books run at
-    refetchInterval: 5_000,
+    // an in-play board moves constantly; a settled one has nothing left to say
+    refetchInterval: (query) =>
+      (query.state.data as EventDetail | undefined)?.status === "finished" ? false : 5_000,
   });
   const live = useQuery({
     queryKey: ["event-live", eventId],
@@ -69,7 +70,8 @@ export default function EventDetailPage() {
   if (event.isLoading) return <div className="h-64 animate-pulse border border-ex-line bg-white" />;
   if (event.isError || !e) return <ErrorState onRetry={() => event.refetch()} />;
 
-  const isLive = (live.data?.status ?? e.status) === "live";
+  const finished = e.status === "finished" || !!e.winner;
+  const isLive = !finished && (live.data?.status ?? e.status) === "live";
   const board = live.data?.board;
 
   function select(outcome: OddsOutcome, book: Bookmaker, side: "BACK" | "LAY", price: number) {
@@ -87,7 +89,9 @@ export default function EventDetailPage() {
           <div className="flex items-center justify-between gap-2 bg-ex-brand px-3 py-2 text-white">
             <h1 className="truncate text-[13px] font-bold uppercase sm:text-[15px]">{e.name}</h1>
             <span className="shrink-0 text-[12px]">
-              {isLive ? (
+              {finished ? (
+                <span className="rounded-sm bg-slate-200 px-2 py-0.5 font-bold text-slate-800">FINISHED</span>
+              ) : isLive ? (
                 <span className="rounded-sm bg-yellow-400 px-2 py-0.5 font-bold text-slate-900">IN-PLAY</span>
               ) : (
                 formatDateTime(e.start_time)
@@ -95,7 +99,15 @@ export default function EventDetailPage() {
             </span>
           </div>
 
-          {board ? (
+          {finished && e.winner ? (
+            <div className="flex items-center gap-2 border-b border-ex-line bg-green-50 px-3 py-2">
+              <span className="rounded-sm bg-green-600 px-2 py-0.5 text-[11px] font-bold uppercase text-white">
+                Winner
+              </span>
+              <span className="text-[14px] font-bold text-slate-800">{e.winner}</span>
+              <span className="text-[12px] text-slate-500">· market settled, bets are paid out</span>
+            </div>
+          ) : board ? (
             <ScoreStrip board={board} />
           ) : (
             <div className="grid grid-cols-2 divide-x divide-ex-line">
@@ -111,7 +123,9 @@ export default function EventDetailPage() {
 
         {books.length === 0 ? (
           <p className="border border-ex-line bg-white px-3 py-10 text-center text-sm text-slate-500">
-            No markets open for this event right now.
+            {finished
+              ? "This match is over — its markets are closed."
+              : "No markets open for this event right now. Prices appear as the books open them."}
           </p>
         ) : (
           <>

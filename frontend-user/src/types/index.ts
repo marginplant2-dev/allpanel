@@ -60,6 +60,8 @@ export interface SportEvent {
   home_team?: string;
   away_team?: string;
   odds?: EventOdds[];
+  /** Set once the market settles — the runner the feed marked WINNER. */
+  winner?: string | null;
 }
 
 /** One rung of the price ladder: a price and the money available at it. */

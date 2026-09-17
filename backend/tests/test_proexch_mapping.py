@@ -259,3 +259,32 @@ def test_soccer_dto_key_names_map_to_the_same_sections():
     )
     assert [b["kind"] for b in books] == ["match_odds", "bookmaker"]
     assert books[0]["markets"][0]["outcomes"][0]["back_ladder"][0]["price"] == 3.6
+
+
+def test_a_settled_market_names_the_winner():
+    """After a match the prices go to zero and the runners carry WINNER / LOSER —
+    the only place the match-odds result appears (scores 404 once it ends)."""
+    from app.modules.providers.proexch_provider import winner_from
+
+    books = map_bookmakers(
+        {
+            "matchOdds": [
+                {
+                    "mid": "1",
+                    "mname": "MATCH_ODDS",
+                    "mstatus": "CLOSED",
+                    "oddDatas": [
+                        {"rname": "Afghanistan", "status": "LOSER", "b1": "0", "l1": "0"},
+                        {"rname": "India", "status": "WINNER", "b1": "0", "l1": "0"},
+                    ],
+                }
+            ]
+        }
+    )
+    assert winner_from(books) == "India"
+
+
+def test_an_open_market_has_no_winner_yet():
+    from app.modules.providers.proexch_provider import winner_from
+
+    assert winner_from(map_bookmakers(LADDER_PAYLOAD)) is None

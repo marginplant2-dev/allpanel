@@ -192,7 +192,9 @@ class BetService:
             bets = await self.repo.pending_for_event(event_id)
             if not bets:
                 continue
-            winner = _determine_winner(bets[0], live.get("score") or {})
+            # the feed names the winner outright on a settled market; scores are
+            # only a fallback for providers that do not
+            winner = live.get("winner") or _determine_winner(bets[0], live.get("score") or {})
             if winner is None:
                 continue
 

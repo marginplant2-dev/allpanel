@@ -51,6 +51,12 @@ function Cell({
 
 const ROW = "grid-cols-[1fr_repeat(6,44px)] sm:grid-cols-[1fr_repeat(6,62px)]";
 
+/** WINNER / LOSER once the market is settled — not a suspension, a result. */
+function settledLabel(outcome: OddsOutcome): string | null {
+  const status = (outcome.status ?? "").toUpperCase();
+  return status === "WINNER" || status === "LOSER" ? status : null;
+}
+
 export function MatchOddsBoard({
   book,
   suspended,
@@ -116,10 +122,21 @@ export function MatchOddsBoard({
             />
           ))}
 
-          {(closed || o.status === "SUSPENDED") && (
-            <span className="absolute inset-y-0 right-0 grid w-[264px] place-items-center bg-ex-suspend/95 text-[11px] font-bold uppercase tracking-wide text-white sm:w-[372px]">
-              {o.status && o.status !== "ACTIVE" ? o.status : "Suspended"}
+          {settledLabel(o) ? (
+            <span
+              className={cn(
+                "absolute inset-y-0 right-0 grid w-[264px] place-items-center text-[11px] font-bold uppercase tracking-wide text-white sm:w-[372px]",
+                settledLabel(o) === "WINNER" ? "bg-green-600" : "bg-slate-400",
+              )}
+            >
+              {settledLabel(o)}
             </span>
+          ) : (
+            (closed || o.status === "SUSPENDED") && (
+              <span className="absolute inset-y-0 right-0 grid w-[264px] place-items-center bg-ex-suspend/95 text-[11px] font-bold uppercase tracking-wide text-white sm:w-[372px]">
+                {o.status && o.status !== "ACTIVE" ? o.status : "Suspended"}
+              </span>
+            )
           )}
         </div>
       ))}

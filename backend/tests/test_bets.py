@@ -372,3 +372,57 @@ async def test_lay_holds_liability_and_pays_when_the_runner_loses(client, db):
 
     wallet = await db.wallets.find_one({"_id": str(user["_id"])})
     assert wallet["available_balance"] == 890 and wallet["locked_balance"] == 110
+
+
+async def test_settlement_uses_the_feeds_winner(db, monkeypatch):
+    """When the feed names the winner outright, settlement does not need scores."""
+    from app.core.enums import BetStatus
+    from app.modules.bets.service import BetService
+    from app.utils.time import utcnow
+
+    backer = await make_user(db, "back_win", Role.USER)
+    layer = await make_user(db, "lay_lose", Role.USER)
+    for u, locked in ((backer, 100.0), (layer, 110.0)):
+        await db.wallets.update_one(
+            {"_id": str(u["_id"])},
+            {"$set": {"available_balance": 0.0, "locked_balance": locked}},
+            upsert=True,
+        )
+    common = {
+        "event_id": "cricket:9:1.9",
+        "event_name": "Feed XI vs Result CC",
+        "home_team": "Feed XI",
+        "away_team": "Result CC",
+        "start_time": utcnow(),
+        "outcome_name": "Feed XI",
+        "status": BetStatus.PENDING.value,
+        "placed_at": utcnow(),
+        "settled_at": None,
+        "payout": None,
+    }
+    await db.bets.insert_one(
+        {**common, "user_id": str(backer["_id"]), "side": "BACK", "price": 2.0,
+         "stake": 100.0, "exposure": 100.0, "potential_payout": 200.0}
+    )
+    await db.bets.insert_one(
+        {**common, "user_id": str(layer["_id"]), "side": "LAY", "price": 2.1,
+         "stake": 100.0, "exposure": 110.0, "potential_payout": 210.0}
+    )
+
+    service = BetService(db)
+
+    class FeedWithResult:
+        async def get_live_data(self, event_id):
+            return {"event_id": event_id, "status": "finished", "winner": "Feed XI", "score": {}}
+
+        async def get_event_detail(self, event_id):
+            return {"id": event_id}
+
+    monkeypatch.setattr(service, "provider", FeedWithResult())
+    assert await service.settle_pending() == 2
+
+    back_wallet = await db.wallets.find_one({"_id": str(backer["_id"])})
+    lay_wallet = await db.wallets.find_one({"_id": str(layer["_id"])})
+    assert back_wallet["available_balance"] == 200.0   # backed the winner
+    assert lay_wallet["available_balance"] == 0.0      # laid the winner, liability lost
+    assert lay_wallet["locked_balance"] == 0.0
