@@ -1,4 +1,17 @@
-# Deploying SportX next to an existing site (same server)
+# Deploying AllPanel next to an existing site (same server)
+
+> **Live status (17 Sep 2026)** — deployed on `13.204.121.174` beside marginplant:
+> backend `sportx-api` on 127.0.0.1:8010, frontends in `/var/www/sportx/{user,admin}`,
+> nginx file `allpanel55.conf` (mirrored in `deploy/nginx/`). Serving on HTTP and
+> verified by Host header. **Waiting on DNS** before TLS — see the table below.
+>
+> | Host | A record needed | Serves |
+> |---|---|---|
+> | `allpanel55.com`, `www` | 13.204.121.174 (currently 2.57.91.91, Hostinger parked) | player site |
+> | `admin.allpanel55.com` | 13.204.121.174 (missing) | admin console |
+> | `api.allpanel55.com` | 13.204.121.174 (missing) | API + WebSocket |
+>
+> Once those resolve: `sudo certbot --nginx -d allpanel55.com -d www.allpanel55.com -d admin.allpanel55.com -d api.allpanel55.com`
 
 Written for: whoever runs the server — assumes root/sudo and an existing production
 site on the same box that must keep running untouched.
