@@ -1,0 +1,47 @@
+; SportX backend as its own service, sized so it cannot disturb whatever else
+; runs on this box. Install to /etc/systemd/system/sportx-api.service
+;
+;   sudo cp deploy/systemd/sportx-api.service /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now sportx-api
+;   systemctl status sportx-api
+;
+[Unit]
+Description=SportX API (FastAPI/uvicorn)
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sportx
+Group=sportx
+WorkingDirectory=/opt/sportx/backend
+EnvironmentFile=/opt/sportx/backend/.env
+
+; Bound to loopback: nginx is the only way in, so no new public port is opened.
+; One worker — the WebSocket manager and rate limiter are in-process (see
+; deploy/README.md); more workers need Redis first.
+ExecStart=/opt/sportx/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010 --workers 1
+
+Restart=on-failure
+RestartSec=5
+
+; --- guard rails for the neighbour app on this server ---
+MemoryMax=600M
+CPUQuota=50%
+TasksMax=256
+Nice=5
+
+; --- hardening ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/sportx
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sportx-api
+
+[Install]
+WantedBy=multi-user.target
