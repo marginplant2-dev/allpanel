@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.config import settings
 from app.modules.providers.base import BaseGameProvider, BaseSportsProvider
 from app.modules.providers.mock_provider import MockGameProvider, MockSportsProvider
+from app.modules.providers.proexch_provider import ProexchProvider
 from app.modules.providers.the_odds_provider import TheOddsProvider
 
 logger = logging.getLogger(__name__)
@@ -83,12 +84,14 @@ class FallbackSportsProvider(BaseSportsProvider):
 
 def sports_data_source() -> str:
     """Where sports data is coming from right now: "live" or "seeded" (cooldown)."""
-    if settings.sports_provider != "theodds":
+    if settings.sports_provider not in ("theodds", "proexch"):
         return "seeded"
     return "seeded" if time.monotonic() < _backup_until else "live"
 
 
 def get_sports_provider(db: AsyncIOMotorDatabase) -> BaseSportsProvider:
+    if settings.sports_provider == "proexch":
+        return FallbackSportsProvider(ProexchProvider(db), MockSportsProvider(db))
     if settings.sports_provider == "theodds":
         return FallbackSportsProvider(TheOddsProvider(db), MockSportsProvider(db))
     # Future: external providers keyed by settings.sports_provider

@@ -13,6 +13,7 @@ import { cn, formatDateTime } from "@/lib/utils";
 interface Runner {
   name: string;
   price: number;
+  lay: number | null;
   bookmakerKey: string;
   bookmakerTitle: string;
 }
@@ -26,7 +27,13 @@ function bestRunners(bookmakers: Bookmaker[]): Runner[] {
       for (const o of m.outcomes) {
         const current = best.get(o.name);
         if (!current || o.price > current.price) {
-          best.set(o.name, { name: o.name, price: o.price, bookmakerKey: b.key, bookmakerTitle: b.title });
+          best.set(o.name, {
+            name: o.name,
+            price: o.price,
+            lay: o.lay ?? null,
+            bookmakerKey: b.key,
+            bookmakerTitle: b.title,
+          });
         }
       }
     }
@@ -39,6 +46,7 @@ function bookmakerRunners(b: Bookmaker): Runner[] {
   return (market?.outcomes ?? []).map((o) => ({
     name: o.name,
     price: o.price,
+    lay: o.lay ?? null,
     bookmakerKey: b.key,
     bookmakerTitle: b.title,
   }));
@@ -89,7 +97,7 @@ function MarketBox({
             {r.price.toFixed(2)}
           </button>
           {/* lay is display-only — see the LAY_SPREAD note in OddsGrid */}
-          <span className="ex-cell h-10 bg-ex-lay">{layPrice(r.price).toFixed(2)}</span>
+          <span className="ex-cell h-10 bg-ex-lay">{(r.lay ?? layPrice(r.price)).toFixed(2)}</span>
           <span className="grid h-10 place-items-center border-l border-ex-line text-[10px] leading-tight text-slate-500">
             <span>Min 100</span>
             <span>Max 50K</span>
@@ -177,17 +185,17 @@ export default function EventDetailPage() {
             <MarketBox
               title="Match Odds"
               runners={bestRunners(bookmakers)}
-              suspended={isLive}
+              suspended={isLive || (bookmakers[0]?.suspended ?? false)}
               selected={selection?.outcomeName}
               onSelect={select}
             />
-            {/* one book only: its prices are the "Match Odds" box, so don't repeat it */}
+            {/* one market only: it is already the "Match Odds" box, so don't repeat it */}
             {(bookmakers.length > 1 ? bookmakers : []).map((b) => (
               <MarketBox
                 key={b.key}
-                title={`Bookmaker · ${b.title}`}
+                title={b.title}
                 runners={bookmakerRunners(b)}
-                suspended={isLive}
+                suspended={isLive || (b.suspended ?? false)}
                 selected={selection?.outcomeName}
                 onSelect={select}
               />

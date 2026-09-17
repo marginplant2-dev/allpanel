@@ -42,7 +42,8 @@ function PriceCell({
   side: "back" | "lay";
   onSelect?: () => void;
 }) {
-  const price = odds ? (side === "back" ? odds.price : layPrice(odds.price)) : null;
+  // a real exchange feed sends its own lay; bookmaker feeds get the derived one
+  const price = odds ? (side === "back" ? odds.price : odds.lay ?? layPrice(odds.price)) : null;
   const clickable = side === "back" && price !== null && !!onSelect;
 
   return (

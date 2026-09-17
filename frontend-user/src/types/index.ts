@@ -40,6 +40,8 @@ export interface Game {
 export interface EventOdds {
   name: string;
   price: number;
+  /** Real lay price when the feed is a two-sided exchange; absent on bookmaker feeds. */
+  lay?: number | null;
   bookmaker_key: string;
   bookmaker_title: string;
 }
@@ -61,6 +63,9 @@ export interface SportEvent {
 export interface OddsOutcome {
   name: string;
   price: number;
+  lay?: number | null;
+  status?: string | null;
+  size?: string | number | null;
   point?: number;
 }
 
@@ -73,6 +78,10 @@ export interface Bookmaker {
   key: string;
   title: string;
   last_update?: string;
+  /** Feed says the market is not taking bets right now. */
+  suspended?: boolean;
+  min_stake?: number;
+  max_stake?: number;
   markets: OddsMarket[];
 }
 
