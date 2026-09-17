@@ -1,10 +1,12 @@
 """Application configuration loaded from environment variables."""
 from __future__ import annotations
 
+import json
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -33,7 +35,12 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
 
     # CORS
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # NoDecode: pass the raw env string to the validator below. Without it
+    # pydantic-settings JSON-decodes list fields first, and the documented
+    # comma-separated form fails with an unreadable SettingsError.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
 
     # Providers
     sports_provider: str = "mock"
@@ -60,8 +67,12 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_cors(cls, value: object) -> object:
+        """Accept both `a,b` and `["a","b"]` — both forms are in the wild."""
         if isinstance(value, str):
-            return [o.strip() for o in value.split(",") if o.strip()]
+            text = value.strip()
+            if text.startswith("["):
+                return json.loads(text)
+            return [o.strip() for o in text.split(",") if o.strip()]
         return value
 
 
