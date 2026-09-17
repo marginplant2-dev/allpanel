@@ -255,16 +255,22 @@ class ProexchProvider(BaseSportsProvider):
                 logger.debug("proexch odds failed for %s: %s", event["id"], exc)
                 return
             books = map_bookmakers(payload or {})
-            if not books:
+            # The 1/X/2 columns are the match odds. A fancy market ("4th wkt",
+            # "6 over runs") has its own runners and belongs on the event page,
+            # never in the board's win columns.
+            book = next(
+                (b for b in books if b["key"].startswith(("match_odds", "bookmaker"))), None
+            )
+            if book is None:
                 return
-            outcomes = books[0]["markets"][0]["outcomes"]
+            outcomes = book["markets"][0]["outcomes"]
             event["odds"] = [
                 {
                     "name": o["name"],
                     "price": o["price"],
                     "lay": o.get("lay"),
-                    "bookmaker_key": books[0]["key"],
-                    "bookmaker_title": books[0]["title"],
+                    "bookmaker_key": book["key"],
+                    "bookmaker_title": book["title"],
                 }
                 for o in outcomes
             ]

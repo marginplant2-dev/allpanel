@@ -120,3 +120,26 @@ def test_each_market_becomes_its_own_box():
 def test_empty_payload_yields_no_books():
     assert map_bookmakers({}) == []
     assert list_odds({}) == []
+
+
+def test_board_prices_come_from_match_odds_not_fancy():
+    """A fancy market's runners ("4th wkt", "6 over runs") must never land in the
+    board's 1/X/2 columns — that is what the event page is for."""
+    books = map_bookmakers(
+        {
+            "matchOdds": [
+                {
+                    "mid": "1",
+                    "mname": "MATCH_ODDS",
+                    "mstatus": "OPEN",
+                    "oddDatas": [{"rname": "Boland", "b1": "1.5", "l1": "1.6"}],
+                }
+            ],
+            "fancyOdds": [
+                {"mid": "2", "mname": "4th wkt NWD", "oddDatas": [{"rname": "4th wkt NWD", "b1": "446", "l1": "446"}]}
+            ],
+        }
+    )
+    board = next(b for b in books if b["key"].startswith(("match_odds", "bookmaker")))
+    assert board["title"] == "MATCH_ODDS"
+    assert [o["name"] for o in board["markets"][0]["outcomes"]] == ["Boland"]
