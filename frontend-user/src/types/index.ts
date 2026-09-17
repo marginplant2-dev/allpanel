@@ -91,7 +91,7 @@ export interface EventDetail extends SportEvent {
   bookmakers?: Bookmaker[];
 }
 
-export type BetStatus = "PENDING" | "WON" | "LOST";
+export type BetStatus = "PENDING" | "WON" | "LOST" | "VOID";
 
 export interface Bet {
   id: string;

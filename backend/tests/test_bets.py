@@ -150,3 +150,91 @@ async def test_settlement_pays_winner_and_closes_loser(client, db):
 
     # Re-running settlement must not double-pay (bets are no longer PENDING).
     assert await BetService(db).settle_pending() == 0
+
+
+async def test_abandoned_event_refunds_the_stake(db, monkeypatch):
+    """A market can close with no result and simply drop out of the feed. The
+    stake must come back rather than sit locked forever."""
+    from datetime import timedelta
+
+    from app.core.enums import BetStatus
+    from app.modules.bets.service import BetService
+    from app.utils.time import utcnow
+
+    user = await make_user(db, "stuck", Role.USER)
+    uid = str(user["_id"])
+    await db.wallets.update_one(
+        {"_id": uid}, {"$set": {"available_balance": 0.0, "locked_balance": 500.0}}, upsert=True
+    )
+    await db.bets.insert_one(
+        {
+            "user_id": uid,
+            "event_id": "cricket:1:1.1",
+            "event_name": "Gone v Vanished",
+            "home_team": "Gone",
+            "away_team": "Vanished",
+            "start_time": utcnow() - timedelta(hours=9),
+            "outcome_name": "Gone",
+            "price": 2.0,
+            "stake": 500.0,
+            "potential_payout": 1000.0,
+            "status": BetStatus.PENDING.value,
+            "placed_at": utcnow() - timedelta(hours=9),
+            "settled_at": None,
+            "payout": None,
+        }
+    )
+
+    service = BetService(db)
+
+    class Gone:
+        async def get_live_data(self, event_id):
+            return None
+
+        async def get_event_detail(self, event_id):
+            return None
+
+    monkeypatch.setattr(service, "provider", Gone())
+    assert await service.settle_pending() == 1
+
+    bet = await db.bets.find_one({"user_id": uid})
+    assert bet["status"] == BetStatus.VOID.value
+    wallet = await db.wallets.find_one({"_id": uid})
+    assert wallet["available_balance"] == 500.0 and wallet["locked_balance"] == 0.0
+
+
+async def test_event_still_listed_is_left_pending(db, monkeypatch):
+    from datetime import timedelta
+
+    from app.core.enums import BetStatus
+    from app.modules.bets.service import BetService
+    from app.utils.time import utcnow
+
+    user = await make_user(db, "waiting", Role.USER)
+    uid = str(user["_id"])
+    await db.bets.insert_one(
+        {
+            "user_id": uid,
+            "event_id": "cricket:2:1.2",
+            "start_time": utcnow() - timedelta(hours=9),
+            "outcome_name": "A",
+            "stake": 100.0,
+            "potential_payout": 200.0,
+            "status": BetStatus.PENDING.value,
+            "placed_at": utcnow(),
+            "settled_at": None,
+            "payout": None,
+        }
+    )
+    service = BetService(db)
+
+    class StillThere:
+        async def get_live_data(self, event_id):
+            return None
+
+        async def get_event_detail(self, event_id):
+            return {"id": event_id}
+
+    monkeypatch.setattr(service, "provider", StillThere())
+    assert await service.settle_pending() == 0
+    assert (await db.bets.find_one({"user_id": uid}))["status"] == BetStatus.PENDING.value

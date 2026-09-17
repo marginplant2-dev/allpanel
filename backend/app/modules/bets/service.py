@@ -12,7 +12,8 @@ Design notes
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -30,7 +31,14 @@ from app.modules.wallet.repository import WalletRepository
 from app.utils.ids import serialize, serialize_many
 from app.utils.time import utcnow
 
+logger = logging.getLogger(__name__)
+
 MARKET = "h2h"
+
+#: A market can close without the feed ever publishing a result (the event simply
+#: disappears). Rather than sit on a player's stake forever, refund it once the
+#: event is this old and no longer in the feed.
+VOID_AFTER = timedelta(hours=6)
 
 
 def _as_datetime(value: Any) -> datetime | None:
@@ -165,6 +173,7 @@ class BetService:
         for event_id in await self.repo.pending_event_ids():
             live = await self.provider.get_live_data(event_id)
             if live is None or live.get("status") != "finished":
+                settled += await self._void_if_abandoned(event_id)
                 continue
             bets = await self.repo.pending_for_event(event_id)
             if not bets:
@@ -191,6 +200,31 @@ class BetService:
                 await self._notify_settlement(bet, won)
                 settled += 1
         return settled
+
+    async def _void_if_abandoned(self, event_id: str) -> int:
+        """Refund bets on an event the feed has dropped without a result."""
+        bets = await self.repo.pending_for_event(event_id)
+        if not bets:
+            return 0
+        start = _as_datetime(bets[0].get("start_time"))
+        if start is None or utcnow() - start < VOID_AFTER:
+            return 0
+        if await self.provider.get_event_detail(event_id) is not None:
+            return 0  # still listed: it just has not finished yet
+
+        voided = 0
+        for bet in bets:
+            claimed = await self.repo.claim_settlement(
+                bet["_id"], status=BetStatus.VOID.value, payout=bet["stake"], settled_at=utcnow()
+            )
+            if claimed is None:
+                continue
+            await self.wallets.unlock(bet["user_id"], bet["stake"])
+            await self._publish_wallet(bet["user_id"])
+            voided += 1
+        if voided:
+            logger.info("voided %s abandoned bet(s) on %s", voided, event_id)
+        return voided
 
     async def _publish_wallet(self, user_id: str) -> None:
         from app.websocket.events import publish_wallet_update

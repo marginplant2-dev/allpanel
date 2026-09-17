@@ -92,6 +92,8 @@ class BetStatus(str, Enum):
     PENDING = "PENDING"
     WON = "WON"
     LOST = "LOST"
+    #: Event vanished from the feed without a result — stake refunded.
+    VOID = "VOID"
 
 
 class GameRoundStatus(str, Enum):
