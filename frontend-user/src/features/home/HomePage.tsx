@@ -28,13 +28,23 @@ export default function HomePage() {
     return map;
   }, [sports.data]);
 
+  // Cricket leads the board here the way it does on every exchange in this market;
+  // anything else the feed sends follows, busiest first.
+  const PRIORITY = ["Cricket", "Soccer", "Tennis"];
   const tabs = useMemo(() => {
     const counts = new Map<string, number>();
     for (const e of events.data ?? []) {
       const group = groupOf.get(e.sport_id) ?? e.league ?? "Sports";
       counts.set(group, (counts.get(group) ?? 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => g);
+    return [...counts.entries()]
+      .sort((a, b) => {
+        const pa = PRIORITY.indexOf(a[0]);
+        const pb = PRIORITY.indexOf(b[0]);
+        if (pa !== pb) return (pa < 0 ? 99 : pa) - (pb < 0 ? 99 : pb);
+        return b[1] - a[1];
+      })
+      .map(([g]) => g);
   }, [events.data, groupOf]);
 
   const activeTab = tab ?? tabs[0] ?? "";
