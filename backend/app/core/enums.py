@@ -88,6 +88,11 @@ class RequestStatus(str, Enum):
     REJECTED = "REJECTED"
 
 
+class BetSide(str, Enum):
+    BACK = "BACK"
+    LAY = "LAY"
+
+
 class BetStatus(str, Enum):
     PENDING = "PENDING"
     WON = "WON"

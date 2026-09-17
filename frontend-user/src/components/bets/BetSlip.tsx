@@ -12,6 +12,7 @@ export interface BetSelection {
   bookmakerTitle: string;
   outcomeName: string;
   price: number;
+  side: "BACK" | "LAY";
 }
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 25000, 50000, 75000, 90000, 95000];
@@ -49,6 +50,8 @@ export function BetSlip({
         bookmaker_key: selection.bookmakerKey,
         outcome_name: selection.outcomeName,
         stake: Number(stake),
+        side: selection.side,
+        price: selection.price,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wallet"] });
@@ -58,7 +61,10 @@ export function BetSlip({
   });
 
   const stakeNum = Number(stake) || 0;
-  const profit = stakeNum > 0 ? stakeNum * (selection.price - 1) : 0;
+  const isLay = selection.side === "LAY";
+  // backing risks the stake to win the profit; laying risks the liability to win the stake
+  const profit = stakeNum > 0 ? (isLay ? stakeNum : stakeNum * (selection.price - 1)) : 0;
+  const liability = stakeNum > 0 && isLay ? stakeNum * (selection.price - 1) : 0;
   const tooSmall = stakeNum > 0 && stakeNum < MIN_STAKE;
   const tooBig = stakeNum > MAX_STAKE;
   const canSubmit = stakeNum >= MIN_STAKE && !tooBig && !mutation.isPending;
@@ -67,20 +73,27 @@ export function BetSlip({
   return (
     <section className={cn("border border-ex-line bg-white shadow-lg lg:shadow-none", className)}>
       <div className="flex items-center justify-between bg-ex-nav px-3 py-1.5">
-        <h2 className="text-[13px] font-bold text-white">Place Bet</h2>
+        <h2 className="text-[13px] font-bold text-white">
+          Place Bet <span className="text-white/70">· {isLay ? "LAY" : "BACK"}</span>
+        </h2>
         <button type="button" onClick={onClose} aria-label="Close bet slip" className="text-white/80 hover:text-white">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       <div className="grid grid-cols-[1fr_60px_72px_56px] sm:grid-cols-[1fr_74px_84px_64px] items-center border-b border-ex-line bg-ex-head px-2 py-1 text-[11px] font-bold text-slate-600">
-        <span>(Bet for)</span>
+        <span>({isLay ? "Bet against" : "Bet for"})</span>
         <span className="text-center">Odds</span>
         <span className="text-center">Stake</span>
-        <span className="text-right">Profit</span>
+        <span className="text-right">{isLay ? "Liability" : "Profit"}</span>
       </div>
 
-      <div className="grid grid-cols-[1fr_60px_72px_56px] sm:grid-cols-[1fr_74px_84px_64px] items-center gap-1 bg-ex-back3 px-2 py-2">
+      <div
+        className={cn(
+          "grid grid-cols-[1fr_60px_72px_56px] items-center gap-1 px-2 py-2 sm:grid-cols-[1fr_74px_84px_64px]",
+          isLay ? "bg-ex-lay3" : "bg-ex-back3",
+        )}
+      >
         <span className="pr-1 text-[12px] font-bold leading-tight text-slate-800">{selection.outcomeName}</span>
         <span className="grid h-8 place-items-center rounded-sm border border-ex-line bg-white text-[13px] font-bold text-slate-900">
           {selection.price.toFixed(2)}
@@ -96,10 +109,12 @@ export function BetSlip({
           autoFocus
           className="h-8 w-full rounded-sm border border-ex-line px-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-ex-brand"
         />
-        <span className="text-right text-[13px] font-bold text-slate-900">{formatCredits(Math.round(profit))}</span>
+        <span className="text-right text-[13px] font-bold text-slate-900">
+          {formatCredits(Math.round(isLay ? liability : profit))}
+        </span>
       </div>
 
-      <div className="grid grid-cols-5 gap-1 bg-ex-back3 px-2 pb-1">
+      <div className={cn("grid grid-cols-5 gap-1 px-2 pb-1", isLay ? "bg-ex-lay3" : "bg-ex-back3")}>
         {QUICK_AMOUNTS.map((v) => (
           <button
             key={v}
@@ -112,7 +127,7 @@ export function BetSlip({
         ))}
       </div>
 
-      <div className="bg-ex-back3 px-2 pb-2 text-right">
+      <div className={cn("px-2 pb-2 text-right", isLay ? "bg-ex-lay3" : "bg-ex-back3")}>
         <button type="button" onClick={() => setStake("")} className="text-[12px] text-ex-brand hover:underline">
           clear
         </button>
@@ -121,6 +136,7 @@ export function BetSlip({
       <div className="px-2 pb-2 text-[11px]">
         <p className="text-slate-500">
           Min {formatCredits(MIN_STAKE)} · Max {formatCredits(MAX_STAKE)} · {selection.bookmakerTitle}
+          {isLay && stakeNum > 0 ? ` · wins ${formatCredits(Math.round(profit))}` : ""}
         </p>
         {tooSmall && <p className="text-red-600">Minimum stake is {formatCredits(MIN_STAKE)}.</p>}
         {tooBig && <p className="text-red-600">Maximum stake is {formatCredits(MAX_STAKE)}.</p>}

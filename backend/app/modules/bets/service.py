@@ -19,7 +19,7 @@ from typing import Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.dependencies import CurrentUser
-from app.core.enums import BetStatus, Role
+from app.core.enums import BetSide, BetStatus, Role
 from app.core.exceptions import NotFoundError, ValidationError
 from app.modules.audit.models import AuditAction
 from app.modules.audit.service import record_audit
@@ -78,15 +78,13 @@ class BetService:
         if event is None:
             raise NotFoundError("Event not found")
 
-        start_time = _as_datetime(event.get("start_time"))
-        if start_time is not None and start_time <= utcnow():
-            raise ValidationError("Betting is closed for this event")
-
         bookmaker = next(
             (b for b in event.get("bookmakers", []) if b.get("key") == payload.bookmaker_key), None
         )
         if bookmaker is None:
             raise ValidationError("Selected bookmaker odds are no longer available")
+        if bookmaker.get("suspended"):
+            raise ValidationError("This market is suspended")
         market = next((m for m in bookmaker.get("markets", []) if m.get("key") == MARKET), None)
         if market is None:
             raise ValidationError("Selected market is no longer available")
@@ -95,18 +93,26 @@ class BetService:
         )
         if outcome is None:
             raise ValidationError("Selected odds are no longer available")
+        status = str(outcome.get("status") or "ACTIVE").upper()
+        if status not in ("ACTIVE", "OPEN", ""):
+            raise ValidationError(f"Selection is {outcome.get('status')}")
 
-        try:
-            price = float(outcome["price"])
-        except (TypeError, ValueError, KeyError):
-            raise ValidationError("Invalid odds")
-        if price <= 1:
-            raise ValidationError("Invalid odds")
+        side = BetSide(payload.side)
+        price = _pick_price(outcome, side, payload.price)
 
         stake = float(payload.stake)
-        potential_payout = round(stake * price, 2)
+        if side is BetSide.BACK:
+            # risk the stake, win stake x price back
+            exposure = stake
+            potential_payout = round(stake * price, 2)
+        else:
+            # lay: risk the liability, win the backer's stake (plus the liability back)
+            exposure = round(stake * (price - 1), 2)
+            if exposure <= 0:
+                raise ValidationError("Invalid odds")
+            potential_payout = round(exposure + stake, 2)
 
-        locked = await self.wallets.try_lock(user.id, stake)
+        locked = await self.wallets.try_lock(user.id, exposure)
         if not locked:
             raise InsufficientFundsError("Insufficient available balance")
 
@@ -123,8 +129,11 @@ class BetService:
             "bookmaker_title": bookmaker.get("title"),
             "market": MARKET,
             "outcome_name": payload.outcome_name,
+            "side": side.value,
             "price": price,
             "stake": stake,
+            #: what is actually held from the wallet (stake for a back, liability for a lay)
+            "exposure": exposure,
             "potential_payout": potential_payout,
             "status": BetStatus.PENDING.value,
             "placed_at": now,
@@ -134,7 +143,7 @@ class BetService:
         try:
             await self.repo.insert(doc)
         except Exception:
-            await self.wallets.unlock(user.id, stake)
+            await self.wallets.unlock(user.id, exposure)
             raise
 
         await record_audit(
@@ -142,7 +151,12 @@ class BetService:
             actor_id=user.id,
             action=AuditAction.BET_PLACED,
             target_id=str(doc["_id"]),
-            metadata={"event_id": payload.event_id, "stake": stake, "price": price},
+            metadata={
+                "event_id": payload.event_id,
+                "stake": stake,
+                "price": price,
+                "side": side.value,
+            },
             ip_address=ip,
         )
         await self._publish_wallet(user.id)
@@ -183,7 +197,9 @@ class BetService:
                 continue
 
             for bet in bets:
-                won = bet["outcome_name"] == winner
+                runner_won = bet["outcome_name"] == winner
+                # a lay bet is the other side of the same question
+                won = runner_won if bet.get("side", BetSide.BACK.value) == BetSide.BACK.value else not runner_won
                 payout = bet["potential_payout"] if won else 0.0
                 claimed = await self.repo.claim_settlement(
                     bet["_id"],
@@ -193,10 +209,11 @@ class BetService:
                 )
                 if claimed is None:
                     continue
+                held = float(bet.get("exposure") or bet["stake"])
                 if won:
-                    await self.wallets.settle_win(bet["user_id"], stake=bet["stake"], payout=payout)
+                    await self.wallets.settle_win(bet["user_id"], stake=held, payout=payout)
                 else:
-                    await self.wallets.settle_loss(bet["user_id"], stake=bet["stake"])
+                    await self.wallets.settle_loss(bet["user_id"], stake=held)
                 await self._notify_settlement(bet, won)
                 settled += 1
         return settled
@@ -214,12 +231,13 @@ class BetService:
 
         voided = 0
         for bet in bets:
+            held = float(bet.get("exposure") or bet["stake"])
             claimed = await self.repo.claim_settlement(
-                bet["_id"], status=BetStatus.VOID.value, payout=bet["stake"], settled_at=utcnow()
+                bet["_id"], status=BetStatus.VOID.value, payout=held, settled_at=utcnow()
             )
             if claimed is None:
                 continue
-            await self.wallets.unlock(bet["user_id"], bet["stake"])
+            await self.wallets.unlock(bet["user_id"], held)
             await self._publish_wallet(bet["user_id"])
             voided += 1
         if voided:
@@ -259,3 +277,35 @@ class BetService:
             )
         except Exception:  # noqa: BLE001
             pass
+
+
+def _pick_price(outcome: dict[str, Any], side: BetSide, requested: float | None) -> float:
+    """Resolve the price a bet is struck at.
+
+    The board shows three rungs per side and every one of them is clickable, so a
+    requested price is honoured only while it is still on the ladder — if the
+    market has moved off it, the bet is refused rather than filled at a price the
+    player did not choose.
+    """
+    key = "back_ladder" if side is BetSide.BACK else "lay_ladder"
+    ladder = [
+        float(level["price"])
+        for level in (outcome.get(key) or [])
+        if level.get("price") and float(level["price"]) > 1
+    ]
+    if not ladder:
+        fallback = outcome.get("price") if side is BetSide.BACK else outcome.get("lay")
+        try:
+            value = float(fallback)
+        except (TypeError, ValueError):
+            value = 0.0
+        ladder = [value] if value > 1 else []
+    if not ladder:
+        raise ValidationError("No price available on this side")
+
+    if requested is None:
+        return ladder[0]
+    match = next((p for p in ladder if abs(p - requested) < 1e-9), None)
+    if match is None:
+        raise ValidationError("Odds have changed — please try again")
+    return match

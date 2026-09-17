@@ -49,13 +49,23 @@ SPORTS: dict[str, tuple[str, str, str, str, str]] = {
     "tennis": ("/api/tennis/matches", "TennisMatches", "/api/tennis/data", "Tennis", "Tennis"),
 }
 
-#: odds payload key -> (bookmaker key prefix, fallback title)
-MARKET_GROUPS = (
-    ("matchOdds", "match_odds", "Match Odds"),
-    ("bookMakerOdds", "bookmaker", "Bookmaker"),
-    ("fancyOdds", "fancy", "Fancy"),
-    ("otherMarketOdds", "other", "Other Market"),
+#: Section kind by payload key. Cricket sends `matchOdds`, soccer sends
+#: `matchOddsResponseDTO` for the same thing, so the key is matched loosely —
+#: getting this wrong is why football pages came up empty.
+MARKET_KINDS = (
+    ("matchodds", "match_odds", "Match Odds"),
+    ("bookmaker", "bookmaker", "Bookmaker"),
+    ("fancy", "fancy", "Fancy"),
+    ("othermarket", "other", "Other Market"),
 )
+
+
+def classify(payload_key: str) -> tuple[str, str]:
+    flat = payload_key.lower().replace("_", "")
+    for needle, kind, title in MARKET_KINDS:
+        if needle in flat:
+            return kind, title
+    return "other", "Other Market"
 
 MATCHES_TTL = 30.0
 ODDS_TTL = 5.0
@@ -176,8 +186,13 @@ def map_bookmakers(payload: dict[str, Any]) -> list[dict[str, Any]]:
     travels with the section.
     """
     books: list[dict[str, Any]] = []
-    for group_key, prefix, fallback_title in MARKET_GROUPS:
-        for market in payload.get(group_key) or []:
+    for payload_key, markets in payload.items():
+        if not isinstance(markets, list):
+            continue
+        prefix, fallback_title = classify(payload_key)
+        for market in markets:
+            if not isinstance(market, dict):
+                continue
             outcomes = []
             for odd in market.get("oddDatas") or []:
                 back, lay = ladder(odd, "b"), ladder(odd, "l")

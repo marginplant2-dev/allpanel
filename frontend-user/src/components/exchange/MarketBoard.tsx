@@ -5,11 +5,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * The market board an exchange shows: three back levels and three lay levels per
- * runner, each with the money available at that price.
- *
- * ponytail: only the best price (b1/l1) is clickable — the bet API prices a bet at
- * the best available, so offering the deeper rungs would promise a price it would
- * not honour. Wire per-price bets and they become clickable.
+ * runner, each with the money available at that price. Every rung is clickable and
+ * the bet is struck at exactly the price clicked — the server re-checks the price
+ * is still on the ladder and refuses the bet if the market has moved off it.
  */
 function Cell({
   level,
@@ -20,7 +18,7 @@ function Cell({
   level?: PriceLevel;
   side: "back" | "lay";
   best: boolean;
-  onSelect?: () => void;
+  onSelect?: (price: number) => void;
 }) {
   const shade =
     side === "back"
@@ -30,13 +28,13 @@ function Cell({
       : best
         ? "bg-ex-lay"
         : "bg-ex-lay2";
-  const clickable = best && !!level?.price && !!onSelect;
+  const clickable = !!level?.price && !!onSelect;
 
   return (
     <button
       type="button"
       disabled={!clickable}
-      onClick={onSelect}
+      onClick={() => level?.price && onSelect?.(level.price)}
       className={cn(
         "grid h-11 place-items-center border-l border-ex-line leading-none",
         shade,
@@ -62,7 +60,7 @@ export function MatchOddsBoard({
   book: Bookmaker;
   suspended: boolean;
   selected?: string;
-  onSelect: (outcome: OddsOutcome, book: Bookmaker) => void;
+  onSelect: (outcome: OddsOutcome, book: Bookmaker, side: "BACK" | "LAY", price: number) => void;
 }) {
   const outcomes = book.markets[0]?.outcomes ?? [];
   if (outcomes.length === 0) return null;
@@ -105,11 +103,17 @@ export function MatchOddsBoard({
               level={o.back_ladder?.[i]}
               side="back"
               best={i === 0}
-              onSelect={() => onSelect(o, book)}
+              onSelect={(price) => onSelect(o, book, "BACK", price)}
             />
           ))}
           {[0, 1, 2].map((i) => (
-            <Cell key={`l${i}`} level={o.lay_ladder?.[i]} side="lay" best={i === 0} />
+            <Cell
+              key={`l${i}`}
+              level={o.lay_ladder?.[i]}
+              side="lay"
+              best={i === 0}
+              onSelect={(price) => onSelect(o, book, "LAY", price)}
+            />
           ))}
 
           {(closed || o.status === "SUSPENDED") && (
@@ -126,7 +130,15 @@ export function MatchOddsBoard({
 const FANCY_ROW = "grid-cols-[1fr_52px_52px_56px] sm:grid-cols-[1fr_62px_62px_64px]";
 
 /** Fancy/session markets: a No (lay) and a Yes (back) price with its own limits. */
-function FancyRow({ outcome }: { outcome: OddsOutcome }) {
+function FancyRow({
+  outcome,
+  book,
+  onSelect,
+}: {
+  outcome: OddsOutcome;
+  book: Bookmaker;
+  onSelect: (outcome: OddsOutcome, book: Bookmaker, side: "BACK" | "LAY", price: number) => void;
+}) {
   const closed = !!outcome.status && outcome.status.toUpperCase() !== "ACTIVE";
   const no = outcome.lay_ladder?.[0];
   const yes = outcome.back_ladder?.[0];
@@ -134,14 +146,30 @@ function FancyRow({ outcome }: { outcome: OddsOutcome }) {
   return (
     <div className={cn("relative grid items-center border-b border-ex-line", FANCY_ROW)}>
       <span className="truncate px-2 py-2 text-[13px] text-slate-800">{outcome.name}</span>
-      <span className="grid h-11 place-items-center border-l border-ex-line bg-ex-lay leading-none">
+      <button
+        type="button"
+        disabled={closed || !no?.price}
+        onClick={() => no?.price && onSelect(outcome, book, "LAY", no.price)}
+        className={cn(
+          "grid h-11 place-items-center border-l border-ex-line bg-ex-lay leading-none",
+          !closed && no?.price ? "cursor-pointer hover:brightness-105" : "cursor-default",
+        )}
+      >
         <span className="text-[13px] font-bold text-slate-900">{no?.price ?? "-"}</span>
         {no?.size ? <span className="text-[10px] text-slate-600">{no.size}</span> : null}
-      </span>
-      <span className="grid h-11 place-items-center border-l border-ex-line bg-ex-back leading-none">
+      </button>
+      <button
+        type="button"
+        disabled={closed || !yes?.price}
+        onClick={() => yes?.price && onSelect(outcome, book, "BACK", yes.price)}
+        className={cn(
+          "grid h-11 place-items-center border-l border-ex-line bg-ex-back leading-none",
+          !closed && yes?.price ? "cursor-pointer hover:brightness-105" : "cursor-default",
+        )}
+      >
         <span className="text-[13px] font-bold text-slate-900">{yes?.price ?? "-"}</span>
         {yes?.size ? <span className="text-[10px] text-slate-600">{yes.size}</span> : null}
-      </span>
+      </button>
       <span className="grid h-11 place-items-center border-l border-ex-line text-[9px] leading-tight text-slate-500">
         <span>Min: {outcome.min_stake || 100}</span>
         <span>Max: {outcome.max_stake || "—"}</span>
@@ -156,8 +184,18 @@ function FancyRow({ outcome }: { outcome: OddsOutcome }) {
 }
 
 /** One titled section per fancy family (normal, over by over, ball by ball, …). */
-export function FancySection({ title, books }: { title: string; books: Bookmaker[] }) {
-  const rows = books.flatMap((b) => b.markets[0]?.outcomes ?? []);
+export function FancySection({
+  title,
+  books,
+  onSelect,
+}: {
+  title: string;
+  books: Bookmaker[];
+  onSelect: (outcome: OddsOutcome, book: Bookmaker, side: "BACK" | "LAY", price: number) => void;
+}) {
+  const rows = books.flatMap((b) =>
+    (b.markets[0]?.outcomes ?? []).map((o) => ({ outcome: o, book: b })),
+  );
   if (rows.length === 0) return null;
 
   return (
@@ -172,8 +210,8 @@ export function FancySection({ title, books }: { title: string; books: Bookmaker
             <span className="grid place-items-center border-l border-ex-line bg-ex-back py-1.5 text-slate-900">Yes</span>
             <span className="border-l border-ex-line" />
           </div>
-          {rows.filter((_, i) => i % 2 === 0).map((o) => (
-            <FancyRow key={o.name} outcome={o} />
+          {rows.filter((_, i) => i % 2 === 0).map((r) => (
+            <FancyRow key={r.outcome.name} outcome={r.outcome} book={r.book} onSelect={onSelect} />
           ))}
         </div>
         <div className="border-t border-ex-line lg:border-l lg:border-t-0">
@@ -183,8 +221,8 @@ export function FancySection({ title, books }: { title: string; books: Bookmaker
             <span className="grid place-items-center border-l border-ex-line bg-ex-back py-1.5 text-slate-900">Yes</span>
             <span className="border-l border-ex-line" />
           </div>
-          {rows.filter((_, i) => i % 2 === 1).map((o) => (
-            <FancyRow key={o.name} outcome={o} />
+          {rows.filter((_, i) => i % 2 === 1).map((r) => (
+            <FancyRow key={r.outcome.name} outcome={r.outcome} book={r.book} onSelect={onSelect} />
           ))}
         </div>
       </div>
@@ -196,6 +234,8 @@ export function toSelection(
   event: { id: string; name: string },
   outcome: OddsOutcome,
   book: Bookmaker,
+  side: "BACK" | "LAY",
+  price: number,
 ): BetSelection {
   return {
     eventId: event.id,
@@ -203,7 +243,8 @@ export function toSelection(
     bookmakerKey: book.key,
     bookmakerTitle: book.title,
     outcomeName: outcome.name,
-    price: outcome.price,
+    price,
+    side,
   };
 }
 

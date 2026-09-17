@@ -72,12 +72,12 @@ export default function EventDetailPage() {
   const isLive = (live.data?.status ?? e.status) === "live";
   const board = live.data?.board;
 
-  function select(outcome: OddsOutcome, book: Bookmaker) {
+  function select(outcome: OddsOutcome, book: Bookmaker, side: "BACK" | "LAY", price: number) {
     if (!isAuthenticated) {
       navigate("/login");
       return;
     }
-    setSelection(toSelection({ id: e!.id, name: e!.name }, outcome, book));
+    setSelection(toSelection({ id: e!.id, name: e!.name }, outcome, book, side, price));
   }
 
   return (
@@ -125,7 +125,7 @@ export default function EventDetailPage() {
               />
             ))}
             {fancyGroups.map(([title, group]) => (
-              <FancySection key={title} title={title} books={group} />
+              <FancySection key={title} title={title} books={group} onSelect={select} />
             ))}
           </>
         )}

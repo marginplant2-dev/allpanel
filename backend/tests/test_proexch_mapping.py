@@ -237,3 +237,25 @@ def test_chase_message_is_dropped_when_there_is_no_target():
 
     first_innings = {**SCORE_ROW, "Target": "0"}
     assert map_score("cricket:1:1.1", first_innings)["board"]["message"] is None
+
+
+def test_soccer_dto_key_names_map_to_the_same_sections():
+    """Cricket sends `matchOdds`, soccer sends `matchOddsResponseDTO` — both are
+    match odds. Treating the soccer name as unknown left football pages empty."""
+    books = map_bookmakers(
+        {
+            "matchOddsResponseDTO": [
+                {
+                    "mid": "1",
+                    "mname": "MATCH_ODDS",
+                    "mstatus": "OPEN",
+                    "oddDatas": [{"rname": "PFC Levski Sofia", "b1": "3.6", "bs1": "780", "l1": "3.75"}],
+                }
+            ],
+            "bookMakerOddsResponseDTO": [
+                {"mid": "2", "mname": "Bookmaker", "oddDatas": [{"rname": "The Draw", "b1": "130", "l1": "134"}]}
+            ],
+        }
+    )
+    assert [b["kind"] for b in books] == ["match_odds", "bookmaker"]
+    assert books[0]["markets"][0]["outcomes"][0]["back_ladder"][0]["price"] == 3.6

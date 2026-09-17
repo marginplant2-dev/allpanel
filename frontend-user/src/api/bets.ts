@@ -6,6 +6,10 @@ export function placeBet(payload: {
   bookmaker_key: string;
   outcome_name: string;
   stake: number;
+  /** BACK wins if the runner wins, LAY wins if it does not. */
+  side?: "BACK" | "LAY";
+  /** The exact rung clicked — the server refuses it if the market moved off it. */
+  price?: number;
 }) {
   return unwrap<Bet>(httpClient.post("/bets", payload));
 }

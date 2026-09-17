@@ -44,7 +44,7 @@ function PriceCell({
 }) {
   // a real exchange feed sends its own lay; bookmaker feeds get the derived one
   const price = odds ? (side === "back" ? odds.price : odds.lay ?? layPrice(odds.price)) : null;
-  const clickable = side === "back" && price !== null && !!onSelect;
+  const clickable = price !== null && !!onSelect;
 
   return (
     <button
@@ -88,7 +88,7 @@ export function OddsRow({
   const cols = columnOdds(event);
   const bookmaker = event.odds?.[0]?.bookmaker_title;
 
-  function select(odds?: EventOdds) {
+  function select(odds: EventOdds | undefined, side: "back" | "lay") {
     if (!odds || !onSelect) return;
     onSelect({
       eventId: event.id,
@@ -96,7 +96,8 @@ export function OddsRow({
       bookmakerKey: odds.bookmaker_key,
       bookmakerTitle: odds.bookmaker_title,
       outcomeName: odds.name,
-      price: odds.price,
+      price: side === "lay" ? odds.lay ?? layPrice(odds.price) : odds.price,
+      side: side === "lay" ? "LAY" : "BACK",
     });
   }
 
@@ -123,8 +124,8 @@ export function OddsRow({
       </div>
       {cols.map((odds, i) => (
         <Fragment key={i}>
-          <PriceCell odds={odds} side="back" onSelect={() => select(odds)} />
-          <PriceCell odds={odds} side="lay" />
+          <PriceCell odds={odds} side="back" onSelect={() => select(odds, "back")} />
+          <PriceCell odds={odds} side="lay" onSelect={() => select(odds, "lay")} />
         </Fragment>
       ))}
     </div>

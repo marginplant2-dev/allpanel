@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.enums import Role
 from app.modules.bets.service import BetService
 from app.utils.time import utcnow
+from app.utils.ids import to_object_id
 from tests.conftest import auth_header, login, make_user
 from tests.test_ledger import set_wallet
 
@@ -94,12 +95,24 @@ async def test_place_bet_insufficient_funds(client, db):
     assert res.json()["error"]["code"] == "INSUFFICIENT_FUNDS"
 
 
-async def test_cannot_bet_on_started_event(client, db):
+async def test_in_play_betting_is_allowed_but_a_suspended_market_is_not(client, db):
+    """Exchanges take bets while the match runs — the feed closes a market with its
+    own suspended flag, which is what must stop a bet, not the kick-off time."""
     user = await make_user(db, "bettor3", Role.USER)
     await set_wallet(db, user["_id"], 1000)
     event_id = await _seed_event(db, start_offset=timedelta(hours=-1))
-
     token = await login(client, "bettor3")
+
+    res = await client.post(
+        "/bets",
+        headers=auth_header(token),
+        json={"event_id": event_id, "bookmaker_key": "testbook", "outcome_name": "Alpha FC", "stake": 50},
+    )
+    assert res.status_code == 201, res.text
+
+    await db.events.update_one(
+        {"_id": to_object_id(event_id)}, {"$set": {"bookmakers.0.suspended": True}}
+    )
     res = await client.post(
         "/bets",
         headers=auth_header(token),
@@ -238,3 +251,124 @@ async def test_event_still_listed_is_left_pending(db, monkeypatch):
     monkeypatch.setattr(service, "provider", StillThere())
     assert await service.settle_pending() == 0
     assert (await db.bets.find_one({"user_id": uid}))["status"] == BetStatus.PENDING.value
+
+
+async def _seed_ladder_event(db, *, start_offset):
+    """An event whose match-odds carry the three back and three lay rungs."""
+    from app.utils.time import utcnow
+
+    doc = {
+        "sport_id": "cricket",
+        "name": "Ladder XI vs Depth CC",
+        "participants": ["Ladder XI", "Depth CC"],
+        "home_team": "Ladder XI",
+        "away_team": "Depth CC",
+        "start_time": utcnow() + start_offset,
+        "status": "live",
+        "score": {},
+        "bookmakers": [
+            {
+                "key": "match_odds:1",
+                "title": "MATCH_ODDS",
+                "kind": "match_odds",
+                "suspended": False,
+                "markets": [
+                    {
+                        "key": "h2h",
+                        "outcomes": [
+                            {
+                                "name": "Ladder XI",
+                                "price": 2.0,
+                                "lay": 2.1,
+                                "back_ladder": [
+                                    {"price": 2.0, "size": "100"},
+                                    {"price": 1.95, "size": "50"},
+                                    {"price": 1.9, "size": "20"},
+                                ],
+                                "lay_ladder": [
+                                    {"price": 2.1, "size": "80"},
+                                    {"price": 2.2, "size": "40"},
+                                    {"price": 2.3, "size": "10"},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    result = await db.events.insert_one(doc)
+    return str(result.inserted_id)
+
+
+async def test_a_deeper_rung_can_be_backed_at_the_price_shown(client, db):
+    user = await make_user(db, "depth1", Role.USER)
+    await set_wallet(db, user["_id"], 1000)
+    event_id = await _seed_ladder_event(db, start_offset=timedelta(hours=1))
+    token = await login(client, "depth1")
+
+    res = await client.post(
+        "/bets",
+        headers=auth_header(token),
+        json={
+            "event_id": event_id,
+            "bookmaker_key": "match_odds:1",
+            "outcome_name": "Ladder XI",
+            "stake": 100,
+            "side": "BACK",
+            "price": 1.9,
+        },
+    )
+    assert res.status_code == 201, res.text
+    bet = res.json()["data"]
+    assert bet["price"] == 1.9 and bet["potential_payout"] == 190
+
+
+async def test_a_price_that_left_the_ladder_is_refused(client, db):
+    user = await make_user(db, "depth2", Role.USER)
+    await set_wallet(db, user["_id"], 1000)
+    event_id = await _seed_ladder_event(db, start_offset=timedelta(hours=1))
+    token = await login(client, "depth2")
+
+    res = await client.post(
+        "/bets",
+        headers=auth_header(token),
+        json={
+            "event_id": event_id,
+            "bookmaker_key": "match_odds:1",
+            "outcome_name": "Ladder XI",
+            "stake": 100,
+            "price": 5.0,
+        },
+    )
+    assert res.status_code == 422
+    wallet = await db.wallets.find_one({"_id": str(user["_id"])})
+    assert wallet["available_balance"] == 1000  # nothing held for a refused bet
+
+
+async def test_lay_holds_liability_and_pays_when_the_runner_loses(client, db):
+    user = await make_user(db, "layer1", Role.USER)
+    await set_wallet(db, user["_id"], 1000)
+    event_id = await _seed_ladder_event(db, start_offset=timedelta(hours=1))
+    token = await login(client, "layer1")
+
+    res = await client.post(
+        "/bets",
+        headers=auth_header(token),
+        json={
+            "event_id": event_id,
+            "bookmaker_key": "match_odds:1",
+            "outcome_name": "Ladder XI",
+            "stake": 100,
+            "side": "LAY",
+            "price": 2.1,
+        },
+    )
+    assert res.status_code == 201, res.text
+    bet = res.json()["data"]
+    assert bet["side"] == "LAY"
+    assert bet["exposure"] == 110.0          # liability = 100 x (2.1 - 1)
+    assert bet["potential_payout"] == 210.0  # liability back + the backer's stake
+
+    wallet = await db.wallets.find_one({"_id": str(user["_id"])})
+    assert wallet["available_balance"] == 890 and wallet["locked_balance"] == 110
