@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ROLE_LABELS, creatableRoles } from "@/lib/roles";
@@ -85,11 +86,11 @@ export default function CreateUserPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+              <PasswordInput id="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="confirm">Confirm password</Label>
-              <Input id="confirm" type="password" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} required />
+              <PasswordInput id="confirm" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} required />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="credit_limit">Virtual credit limit</Label>
