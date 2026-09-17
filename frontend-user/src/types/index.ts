@@ -25,6 +25,8 @@ export interface Wallet {
 export interface Game {
   id: string;
   name: string;
+  /** Provider's game id — present once the real catalogue is imported. */
+  game_uid?: string | null;
   slug: string;
   category: string;
   provider: string;

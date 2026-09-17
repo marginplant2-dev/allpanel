@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     proexch_base_url: str = "https://apidata.proexch.in"
     proexch_origin: str = ""
 
+    # Gamblly casino (V1 seamless wallet): balances stay here, the provider calls
+    # our callback for every bet and win. Without a key the casino stays in demo.
+    gamblly_base_url: str = "https://game.gambllyapi.com/production"
+    gamblly_api_key: str = ""
+    gamblly_currency: str = "INR"
+    gamblly_language: str = "en"
+    gamblly_platform: int = 1
+    gamblly_home_url: str = ""
+
     # Rate limiting (per client IP, applied to the API prefix)
     rate_limit_enabled: bool = True
     rate_limit_requests: int = 300

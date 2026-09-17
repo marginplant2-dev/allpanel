@@ -3,6 +3,8 @@ admin writes persist to MongoDB with audit logging.
 """
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -12,7 +14,7 @@ from app.core.exceptions import ConflictError, NotFoundError
 from app.modules.audit.models import AuditAction
 from app.modules.audit.service import record_audit
 from app.modules.games.repository import GameRepository
-from app.modules.games.schema import CategoryCreate, GameCreate, GameUpdate
+from app.modules.games.schema import CategoryCreate, GameCreate, GameImportRequest, GameUpdate
 from app.modules.providers.provider_factory import get_game_provider
 from app.utils.ids import serialize
 from app.utils.time import utcnow
@@ -65,6 +67,65 @@ class GameService:
         )
         return serialize(updated)  # type: ignore[return-value]
 
+    async def import_games(
+        self, actor: CurrentUser, payload: GameImportRequest, *, ip: str | None = None
+    ) -> dict[str, Any]:
+        """Upsert a provider catalogue by `game_uid`.
+
+        Names and artwork come from the provider, so a re-import refreshes them;
+        `replace` deactivates anything the provider no longer lists instead of
+        deleting it, which keeps old rounds readable.
+        """
+        now = utcnow()
+        seen: list[str] = []
+        created = updated = 0
+        for game in payload.games:
+            slug = _slugify(game.name, game.game_uid)
+            seen.append(game.game_uid)
+            fields = {
+                "name": game.name,
+                "game_uid": game.game_uid,
+                "slug": slug,
+                "provider": game.provider,
+                "category": game.category,
+                "status": "active",
+                "featured": game.featured,
+                "sort_order": game.sort_order,
+                "updated_at": now,
+            }
+            if game.thumbnail_url:
+                fields["thumbnail_url"] = game.thumbnail_url
+            if game.banner_url:
+                fields["banner_url"] = game.banner_url
+            result = await self.db.games.update_one(
+                {"game_uid": game.game_uid},
+                {"$set": fields, "$setOnInsert": {"created_at": now, "tags": [game.category]}},
+                upsert=True,
+            )
+            created += 1 if result.upserted_id else 0
+            updated += 1 if result.modified_count else 0
+
+        deactivated = 0
+        if payload.replace:
+            result = await self.db.games.update_many(
+                {"game_uid": {"$nin": seen}}, {"$set": {"status": "inactive", "updated_at": now}}
+            )
+            deactivated = result.modified_count
+
+        await record_audit(
+            self.db,
+            actor_id=actor.id,
+            action=AuditAction.GAME_UPDATED,
+            metadata={"imported": len(seen), "created": created, "deactivated": deactivated},
+            ip_address=ip,
+        )
+        return {
+            "imported": len(seen),
+            "created": created,
+            "updated": updated,
+            "deactivated": deactivated,
+        }
+
     async def delete_game(self, actor: CurrentUser, game_id: str, *, ip: str | None = None) -> None:
         deleted = await self.repo.delete_game(game_id)
         if not deleted:
@@ -90,3 +151,8 @@ def _oid(value: str):
     from app.utils.ids import to_object_id
 
     return to_object_id(value)
+
+
+def _slugify(name: str, fallback: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return slug or fallback.lower()

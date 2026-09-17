@@ -71,7 +71,11 @@ export default function CasinoPage() {
       )}
 
       {!games.isLoading && games.data?.length === 0 && (
-        <p className="px-3 py-10 text-center text-sm text-slate-500">No games match that search.</p>
+        <p className="px-3 py-10 text-center text-sm text-slate-500">
+          {search || category
+            ? "No games match that search."
+            : "The casino catalogue has not been loaded yet."}
+        </p>
       )}
     </div>
   );

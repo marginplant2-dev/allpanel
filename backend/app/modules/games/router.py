@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from app.core.database import get_database
 from app.core.dependencies import AdminUserDep
 from app.core.responses import ok
-from app.modules.games.schema import CategoryCreate, GameCreate, GameUpdate
+from app.modules.games.schema import CategoryCreate, GameCreate, GameImportRequest, GameUpdate
 from app.modules.games.service import GameService
 from app.utils.pagination import PageParams, build_page, pagination_params
 
@@ -67,6 +67,13 @@ async def list_games_admin(
         query["name"] = {"$regex": search, "$options": "i"}
     docs, total = await service.list_admin(query=query, skip=params.skip, limit=params.limit)
     return ok(build_page(docs, total, params))
+
+
+@router.post("/import")
+async def import_games(payload: GameImportRequest, request: Request, actor: AdminUserDep):
+    """Load a provider catalogue (names, artwork and game_uid) in one call."""
+    service = GameService(get_database())
+    return ok(await service.import_games(actor, payload, ip=_ip(request)), message="Catalogue imported")
 
 
 @router.patch("/{game_id}")

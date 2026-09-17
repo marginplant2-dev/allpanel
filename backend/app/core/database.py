@@ -58,6 +58,13 @@ async def ensure_indexes() -> None:
     await db.transactions.create_index([("to_user_id", ASCENDING)])
     await db.transactions.create_index([("created_at", DESCENDING)])
 
+    # one wallet movement per provider transaction, however often it is retried
+    await db.casino_rounds.create_index(
+        [("txn_id", ASCENDING)], unique=True, partialFilterExpression={"txn_id": {"$type": "string"}}
+    )
+    await db.casino_rounds.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
+    await db.casino_sessions.create_index([("user_id", ASCENDING)])
+
     await db.games.create_index([("slug", ASCENDING)], unique=True)
     await db.games.create_index([("category", ASCENDING)])
     await db.games.create_index([("status", ASCENDING)])

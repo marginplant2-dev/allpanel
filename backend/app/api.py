@@ -123,3 +123,10 @@ try:
     api_router.include_router(bets_router)
 except ImportError:
     pass
+
+try:
+    from app.modules.casino.router import router as casino_router
+
+    api_router.include_router(casino_router)
+except ImportError:
+    pass
