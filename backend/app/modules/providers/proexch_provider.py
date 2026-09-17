@@ -284,7 +284,9 @@ class ProexchProvider(BaseSportsProvider):
         events: list[dict[str, Any]] = []
         for sport in wanted:
             events.extend(await self._matches(sport))
-        events.sort(key=lambda e: (e["status"] != "live", e["start_time"] or ""))
+        # Priced markets first: a board that opens on a wall of dashes looks broken,
+        # and a match with no price is one you cannot bet on anyway.
+        events.sort(key=lambda e: (not e.get("odds"), e["status"] != "live", e["start_time"] or ""))
         if status:
             return [e for e in events if e["status"] == status]
         return events
