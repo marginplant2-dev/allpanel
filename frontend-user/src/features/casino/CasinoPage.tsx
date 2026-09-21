@@ -40,8 +40,8 @@ export default function CasinoPage() {
 
   return (
     <div className="border border-ex-line bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-ex-nav px-3 py-2">
-        <h1 className="text-[13px] font-bold text-white">Our Casino</h1>
+      <div className="ex-sec flex-wrap">
+        <h1>Our Casino</h1>
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
@@ -54,7 +54,7 @@ export default function CasinoPage() {
         </div>
       </div>
 
-      <div className="flex overflow-x-auto border-b border-ex-line bg-ex-head">
+      <div className="no-bar flex overflow-x-auto border-b border-ex-line bg-ex-head">
         {tabs.map((c) => (
           <button
             key={c.key ?? "all"}
@@ -74,7 +74,7 @@ export default function CasinoPage() {
           <h2 className="border-b border-ex-line bg-ex-head px-3 py-1.5 text-[12px] font-bold uppercase text-slate-600">
             Live Tables
           </h2>
-          <div className="grid grid-cols-3 gap-1 p-1 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
+          <div className="grid grid-cols-3 gap-1.5 p-1.5 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
             {liveGames.map((g) => (
               <CasinoTile key={g.code} code={g.code} name={g.name} category={g.category} />
             ))}
@@ -85,7 +85,7 @@ export default function CasinoPage() {
       {games.isError ? (
         <ErrorState onRetry={() => games.refetch()} />
       ) : (
-        <div className="grid grid-cols-3 gap-1 p-1 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10">
+        <div className="grid grid-cols-3 gap-1.5 p-1.5 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10">
           {games.isLoading
             ? Array.from({ length: 20 }).map((_, i) => <GameTileSkeleton key={i} />)
             : games.data?.map((g) => <GameTile key={g.id} game={g} />)}

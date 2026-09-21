@@ -26,7 +26,7 @@ export function CasinoTile({
   return (
     <Link
       to={`/casino/live/${code}`}
-      className="group block overflow-hidden border border-ex-line bg-white transition-shadow hover:shadow-md"
+      className="group block overflow-hidden rounded-md border border-ex-line bg-slate-900 shadow-sm ring-ex-brand transition hover:shadow-lg hover:ring-2"
     >
       <img
         src={src}
@@ -35,9 +35,13 @@ export function CasinoTile({
         onError={() => setSrc(casinoTileArt(name, category))}
         className="aspect-[169/281] w-full bg-slate-900 object-cover"
       />
-      <p className="truncate bg-ex-brand px-1.5 py-1 text-center text-[11px] font-bold uppercase text-white group-hover:bg-ex-nav">
-        {name}
-      </p>
+      {/* The supplied artwork has the name printed on it; only the drawn stand-in,
+          which is a different shape and gets cropped, needs a caption. */}
+      {src.startsWith("data:") && (
+        <p className="truncate bg-ex-brand px-1.5 py-1 text-center text-[11px] font-bold uppercase text-white">
+          {name}
+        </p>
+      )}
     </Link>
   );
 }

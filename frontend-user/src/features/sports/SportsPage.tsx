@@ -56,7 +56,7 @@ export default function SportsPage({ liveOnly = false }: { liveOnly?: boolean })
       </div>
 
       <div>
-        <div className="flex items-center justify-between border border-b-0 border-ex-line bg-ex-nav px-3 py-2">
+        <div className="ex-sec border border-b-0 border-ex-line">
           <h1 className="text-[13px] font-bold text-white">{title}</h1>
           {!liveOnly && (
             <div className="flex gap-1">

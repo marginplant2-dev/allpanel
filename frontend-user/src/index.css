@@ -87,6 +87,18 @@
   .ex-head {
     @apply bg-ex-head text-[12px] font-bold uppercase tracking-wide text-slate-600;
   }
+  /* One gradient bar for every panel heading, so the page reads as sections
+     rather than as one flat sheet of blue. */
+  .ex-sec {
+    @apply flex items-center justify-between gap-2 bg-gradient-to-r from-ex-nav to-ex-brand px-3 py-2 text-[13px] font-bold uppercase tracking-wide text-white;
+  }
+  /* Tab strips scroll sideways on a phone; the scrollbar would eat a whole row. */
+  .no-bar {
+    scrollbar-width: none;
+  }
+  .no-bar::-webkit-scrollbar {
+    display: none;
+  }
   .glass {
     @apply border border-white/5 bg-card/60 backdrop-blur-xl;
   }

@@ -53,7 +53,7 @@ export default function GameDetailPage() {
       </Link>
 
       <div className="border border-ex-line bg-white">
-        <div className="flex items-center justify-between gap-2 bg-ex-brand px-3 py-2 text-white">
+        <div className="ex-sec">
           <h1 className="truncate text-[15px] font-bold uppercase">{g.name}</h1>
           <span className="shrink-0 text-[12px] capitalize text-white/80">{g.provider.replace(/_/g, " ")}</span>
         </div>
@@ -100,7 +100,7 @@ export default function GameDetailPage() {
 
       {related.data && related.data.length > 1 && (
         <section className="border border-ex-line bg-white">
-          <h2 className="bg-ex-nav px-3 py-2 text-[13px] font-bold text-white">More {g.category} games</h2>
+          <h2 className="ex-sec">More {g.category} games</h2>
           <div className="grid grid-cols-3 gap-1 p-1 sm:grid-cols-5 lg:grid-cols-8">
             {related.data.filter((r) => r.slug !== g.slug).slice(0, 16).map((r) => (
               <GameTile key={r.id} game={r} />

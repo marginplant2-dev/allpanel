@@ -85,9 +85,9 @@ export default function EventDetailPage() {
   return (
     <div className="grid gap-2 xl:grid-cols-[1fr_320px]">
       <div className="min-w-0">
-        <div className="mb-2 border border-ex-line bg-white">
-          <div className="flex items-center justify-between gap-2 bg-ex-brand px-3 py-2 text-white">
-            <h1 className="truncate text-[13px] font-bold uppercase sm:text-[15px]">{e.name}</h1>
+        <div className="mb-2 overflow-hidden rounded-md border border-ex-line bg-white">
+          <div className="ex-sec">
+            <h1 className="truncate text-[13px] sm:text-[15px]">{e.name}</h1>
             <span className="shrink-0 text-[12px]">
               {finished ? (
                 <span className="rounded-sm bg-slate-200 px-2 py-0.5 font-bold text-slate-800">FINISHED</span>

@@ -75,14 +75,14 @@ export default function HomePage() {
         />
       </div>
 
-      <section className="border border-ex-line bg-white">
-        <h2 className="flex items-center justify-between bg-ex-nav px-3 py-2 text-[13px] font-bold text-white">
+      <section className="overflow-hidden rounded-md border border-ex-line bg-white">
+        <h2 className="ex-sec">
           Our Casino
           <Link to="/casino" className="text-[12px] font-normal text-white/80 hover:text-white">
             View all
           </Link>
         </h2>
-        <div className="grid grid-cols-3 gap-1 p-1 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
+        <div className="grid grid-cols-3 gap-1.5 p-1.5 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
           {(casino.data ?? []).slice(0, 18).map((g) => (
             <CasinoTile key={g.code} code={g.code} name={g.name} category={g.category} />
           ))}

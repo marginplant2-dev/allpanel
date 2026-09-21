@@ -69,7 +69,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 shadow-md">
       {/* Brand bar */}
-      <div className="bg-ex-brand text-white">
+      <div className="bg-gradient-to-r from-ex-brand via-[#2a6fbf] to-ex-brand text-white">
         <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-2 px-2 sm:gap-3 sm:px-3">
           <Link to="/" className="shrink-0 text-lg font-black tracking-[0.15em] sm:text-3xl sm:tracking-[0.2em]">
             SPORTX
@@ -157,15 +157,15 @@ export function Header() {
       </div>
 
       {/* Sport / game strip */}
-      <nav className="bg-ex-nav">
-        <div className="mx-auto flex max-w-[1600px] items-stretch overflow-x-auto px-1">
+      <nav className="bg-gradient-to-r from-ex-nav via-ex-navhover to-ex-nav">
+        <div className="no-bar mx-auto flex max-w-[1600px] items-stretch gap-0.5 overflow-x-auto px-1 py-1">
           {NAV.map((item) => (
             <Link
               key={item.label}
               to={item.to}
               className={cn(
-                "whitespace-nowrap px-3 py-2.5 text-[13px] font-bold tracking-wide text-white/85 transition-colors hover:bg-ex-navhover hover:text-white",
-                current === item.to && "border-b-2 border-yellow-400 text-white",
+                "whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-bold tracking-wide text-white/85 transition-colors hover:bg-white/15 hover:text-white sm:text-[13px]",
+                current === item.to && "bg-yellow-400 text-slate-900 hover:bg-yellow-400 hover:text-slate-900",
               )}
             >
               {item.label}

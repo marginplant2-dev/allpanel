@@ -71,8 +71,14 @@ export function BetSlip({
   const error = mutation.error as ApiError | null;
 
   return (
-    <section className={cn("border border-ex-line bg-white shadow-lg lg:shadow-none", className)}>
-      <div className="flex items-center justify-between bg-ex-nav px-3 py-1.5">
+    <section className={cn("overflow-hidden rounded-md border border-ex-line bg-white shadow-lg lg:shadow-none", className)}>
+      <div
+        className={cn(
+          "flex items-center justify-between bg-gradient-to-r px-3 py-1.5",
+          // the slip wears the side's colour, so a lay is never mistaken for a back
+          isLay ? "from-rose-800 to-rose-600" : "from-ex-nav to-ex-brand",
+        )}
+      >
         <h2 className="text-[13px] font-bold text-white">
           Place Bet <span className="text-white/70">· {isLay ? "LAY" : "BACK"}</span>
         </h2>

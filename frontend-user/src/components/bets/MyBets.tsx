@@ -16,7 +16,7 @@ export function MyBets({ eventId, className }: { eventId?: string; className?: s
 
   return (
     <section className={cn("border border-ex-line bg-white", className)}>
-      <h2 className="bg-ex-nav px-3 py-1.5 text-[13px] font-bold text-white">My Bet</h2>
+      <h2 className="ex-sec py-1.5">My Bet</h2>
       <div className="grid grid-cols-[1fr_60px_74px] border-b border-ex-line bg-ex-head px-2 py-1 text-[11px] font-bold text-slate-600">
         <span>Matched Bet</span>
         <span className="text-right">Odds</span>

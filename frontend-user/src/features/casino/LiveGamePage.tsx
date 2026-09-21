@@ -113,8 +113,8 @@ export default function LiveGamePage() {
           <ArrowLeft className="h-4 w-4" /> Back to casino
         </Link>
 
-        <div className="border border-ex-line bg-white">
-          <div className="flex items-center justify-between gap-2 bg-ex-brand px-3 py-2 text-white">
+        <div className="overflow-hidden rounded-md border border-ex-line bg-white">
+          <div className="ex-sec">
             <span className="flex min-w-0 items-center gap-2">
               <img
                 src={`/casino-art/${t.code}.webp`}
@@ -186,10 +186,11 @@ export default function LiveGamePage() {
 
           {layout.sides.length > 0 && (
             <div className="grid gap-1 p-1 lg:grid-cols-2">
-              {layout.sides.map((side) => (
+              {layout.sides.map((side, i) => (
                 <SideBlock
                   key={side.name}
                   side={side}
+                  index={i}
                   bettingOpen={t.betting_open}
                   selectedSid={selected ? String(selected.sid) : undefined}
                   onSelect={choose}
@@ -200,7 +201,7 @@ export default function LiveGamePage() {
 
           {t.results.length > 0 && (
             <section>
-              <h2 className="bg-ex-nav px-3 py-1.5 text-[12px] font-bold uppercase text-white">Last Results</h2>
+              <h2 className="ex-sec py-1.5 text-[12px]">Last Results</h2>
               <div className="flex flex-wrap items-center gap-2 p-2">
                 {t.results.map((r) => {
                   const name = r.winner_names?.[0] || r.winners[0] || "-";
@@ -227,8 +228,8 @@ export default function LiveGamePage() {
       <aside className="space-y-2">
         {selected && (
           <section className="fixed inset-x-0 bottom-14 z-50 border border-ex-line bg-white shadow-lg xl:static xl:bottom-auto xl:shadow-none">
-            <div className="flex items-center justify-between bg-ex-nav px-3 py-1.5">
-              <h2 className="text-[13px] font-bold text-white">Place Bet</h2>
+            <div className="ex-sec py-1.5">
+              <h2>Place Bet</h2>
               <span className="text-[11px] text-white/70">
                 Range: {formatCredits(selected.min_stake)} – {formatCredits(selected.max_stake)}
               </span>
@@ -306,7 +307,7 @@ export default function LiveGamePage() {
         )}
 
         <section className="border border-ex-line bg-white">
-          <h2 className="bg-ex-nav px-3 py-1.5 text-[13px] font-bold text-white">My Bet</h2>
+          <h2 className="ex-sec py-1.5">My Bet</h2>
           <div className="grid grid-cols-[1fr_58px_70px] border-b border-ex-line bg-ex-head px-2 py-1 text-[11px] font-bold text-slate-600">
             <span>Matched Bet</span>
             <span className="text-right">Odds</span>

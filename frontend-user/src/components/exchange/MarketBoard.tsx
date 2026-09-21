@@ -49,7 +49,7 @@ function Cell({
   );
 }
 
-const ROW = "grid-cols-[1fr_repeat(6,44px)] sm:grid-cols-[1fr_repeat(6,62px)]";
+const ROW = "grid-cols-[1fr_repeat(6,40px)] sm:grid-cols-[1fr_repeat(6,62px)]";
 
 /** WINNER / LOSER once the market is settled — not a suspension, a result. */
 function settledLabel(outcome: OddsOutcome): string | null {
@@ -74,8 +74,8 @@ export function MatchOddsBoard({
 
   return (
     <section className="mb-2 border border-ex-line bg-white">
-      <div className="flex items-center justify-between gap-2 bg-ex-nav px-3 py-1.5">
-        <h2 className="truncate text-[13px] font-bold uppercase text-white">{book.title}</h2>
+      <div className="ex-sec py-1.5">
+        <h2 className="truncate">{book.title}</h2>
         {!!book.max_stake && (
           <span className="shrink-0 text-[11px] text-white/70">Max: {book.max_stake}</span>
         )}
@@ -125,7 +125,7 @@ export function MatchOddsBoard({
           {settledLabel(o) ? (
             <span
               className={cn(
-                "absolute inset-y-0 right-0 grid w-[264px] place-items-center text-[11px] font-bold uppercase tracking-wide text-white sm:w-[372px]",
+                "absolute inset-y-0 col-start-2 col-end-8 grid place-items-center text-[11px] font-bold uppercase tracking-wide text-white",
                 settledLabel(o) === "WINNER" ? "bg-green-600" : "bg-slate-400",
               )}
             >
@@ -133,7 +133,7 @@ export function MatchOddsBoard({
             </span>
           ) : (
             (closed || o.status === "SUSPENDED") && (
-              <span className="absolute inset-y-0 right-0 grid w-[264px] place-items-center bg-ex-suspend/95 text-[11px] font-bold uppercase tracking-wide text-white sm:w-[372px]">
+              <span className="absolute inset-y-0 col-start-2 col-end-8 grid place-items-center bg-ex-suspend/95 text-[11px] font-bold uppercase tracking-wide text-white">
                 {o.status && o.status !== "ACTIVE" ? o.status : "Suspended"}
               </span>
             )
@@ -192,7 +192,7 @@ function FancyRow({
         <span>Max: {outcome.max_stake || "—"}</span>
       </span>
       {closed && (
-        <span className="absolute inset-y-0 right-[56px] grid w-[104px] place-items-center bg-ex-suspend/95 text-[10px] font-bold uppercase text-white sm:right-[64px] sm:w-[124px]">
+        <span className="absolute inset-y-0 col-start-2 col-end-4 grid place-items-center bg-ex-suspend/95 text-[10px] font-bold uppercase text-white">
           {outcome.status}
         </span>
       )}
@@ -217,7 +217,7 @@ export function FancySection({
 
   return (
     <section className="mb-2 border border-ex-line bg-white">
-      <h2 className="bg-ex-nav px-3 py-1.5 text-[13px] font-bold uppercase text-white">{title}</h2>
+      <h2 className="ex-sec py-1.5">{title}</h2>
       <div className="grid lg:grid-cols-2">
         {/* two columns on desktop, exactly as the books lay these out */}
         <div>
