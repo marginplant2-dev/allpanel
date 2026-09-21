@@ -5,8 +5,10 @@ import { casinoTileArt } from "@/components/game/casinoArt";
 /**
  * A live-casino lobby tile.
  *
- * The artwork ships in `public/casino/<CODE>.png` (portrait, as supplied). If one
- * is missing the drawn tile stands in, so a new game code never leaves a hole.
+ * The artwork ships in `public/casino-art/<CODE>.png` (portrait, as supplied) —
+ * not `/casino/`, which is an SPA route: a real directory there makes nginx
+ * answer 403 instead of serving the app. If a file is missing the drawn tile stands in,
+ * so a new game code never leaves a hole.
  */
 export function CasinoTile({
   code,
@@ -17,7 +19,7 @@ export function CasinoTile({
   name: string;
   category: string;
 }) {
-  const [src, setSrc] = useState(`/casino/${code}.png`);
+  const [src, setSrc] = useState(`/casino-art/${code}.png`);
 
   return (
     <Link

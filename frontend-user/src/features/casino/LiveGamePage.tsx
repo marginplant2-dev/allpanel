@@ -117,7 +117,7 @@ export default function LiveGamePage() {
           <div className="flex items-center justify-between gap-2 bg-ex-brand px-3 py-2 text-white">
             <span className="flex min-w-0 items-center gap-2">
               <img
-                src={`/casino/${t.code}.png`}
+                src={`/casino-art/${t.code}.png`}
                 alt=""
                 aria-hidden
                 onError={(e) => {
