@@ -119,7 +119,7 @@ export function OddsRow({
         </Link>
         <span className="flex shrink-0 items-center gap-1.5 pl-1">
           {isLive && <span className="h-2.5 w-2.5 rounded-full bg-green-500 animate-blink" title="In-play" />}
-          {isLive && <Monitor className="h-3.5 w-3.5 text-slate-600" />}
+          {isLive && <Monitor className="hidden h-3.5 w-3.5 text-slate-600 sm:block" />}
           {bookmaker && (
             <span className="rounded-sm bg-slate-700 px-1 text-[10px] font-bold text-white" title={bookmaker}>
               BM

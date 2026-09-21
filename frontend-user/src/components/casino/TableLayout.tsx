@@ -14,9 +14,10 @@ import { cn, formatCredits } from "@/lib/utils";
  */
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const SIDE_WORDS = /^(odd|even|red|black)$/i;
-/** "Under 7" / "Over 7" end in a rank too — a card grid only earns the name with a
- *  real run of cards behind it, so anything shorter falls back to a main button. */
-const MIN_CARDS = 5;
+/** "Under 7" ends in a rank and "Black B" starts with a colour, so both look like
+ *  members of a group of one. A block only earns its own section once enough
+ *  selections share the name; anything smaller belongs in the main row. */
+const MIN_BLOCK = 4;
 
 /** A colour per side block, so the sections of a table don't read as one flat sheet. */
 const SIDE_TONES = [
@@ -60,11 +61,10 @@ export function classifyOptions(options: CasinoOption[]): Classified {
     }
   }
 
-  // A one- or two-card "block" was a false positive; give those back to the main row.
   const kept: { name: string; chips: CasinoOption[]; cards: CasinoOption[] }[] = [];
   for (const [name, v] of sides) {
-    if (v.chips.length === 0 && v.cards.length < MIN_CARDS) main.push(...v.cards);
-    else if (v.chips.length || v.cards.length) kept.push({ name, ...v });
+    if (v.chips.length + v.cards.length < MIN_BLOCK) main.push(...v.chips, ...v.cards);
+    else kept.push({ name, ...v });
   }
 
   return { main: main.sort((a, b) => a.sort - b.sort), sides: kept };
@@ -73,8 +73,10 @@ export function classifyOptions(options: CasinoOption[]): Classified {
 function shortLabel(option: CasinoOption, side: string): string {
   const name = option.name ?? "";
   if (!side) return name;
-  // "Dragon A" inside the DRAGON block reads better as just "A"
-  return name.replace(new RegExp(`\\s*${side}\\s*`, "i"), "").trim() || name;
+  // "Dragon A" inside the DRAGON block reads better as just "A" — but only the whole
+  // word comes off, or "Black B" would come back as "lack".
+  const word = side.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return name.replace(new RegExp(`^${word}\\s+|\\s+${word}$`, "i"), "").trim() || name;
 }
 
 function Lock() {
