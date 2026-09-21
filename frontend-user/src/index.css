@@ -82,7 +82,7 @@
   /* Exchange grid primitives — one place for the odds-cell geometry so the
      home grid and the market board stay pixel-identical. */
   .ex-cell {
-    @apply grid h-9 place-items-center border-l border-ex-line text-[13px] font-bold leading-none text-slate-900;
+    @apply grid h-9 place-items-center border-l border-ex-line text-[12px] font-bold leading-none text-slate-900 sm:text-[13px];
   }
   .ex-head {
     @apply bg-ex-head text-[12px] font-bold uppercase tracking-wide text-slate-600;

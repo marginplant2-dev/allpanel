@@ -26,11 +26,13 @@ export function CasinoTile({
   return (
     <Link
       to={`/casino/live/${code}`}
+      aria-label={name}
       className="group block overflow-hidden rounded-md border border-ex-line bg-slate-900 shadow-sm ring-ex-brand transition hover:shadow-lg hover:ring-2"
     >
       <img
         src={src}
-        alt={name}
+        alt=""
+        aria-hidden
         loading="lazy"
         onError={() => setSrc(casinoTileArt(name, category))}
         className="aspect-[169/281] w-full bg-slate-900 object-cover"
