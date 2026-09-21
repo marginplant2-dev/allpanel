@@ -5,7 +5,9 @@ import { casinoTileArt } from "@/components/game/casinoArt";
 /**
  * A live-casino lobby tile.
  *
- * The artwork ships in `public/casino-art/<CODE>.png` (portrait, as supplied) —
+ * The artwork ships as `public/casino-art/<CODE>.webp` (the supplied PNGs live in
+ * art-src/casino; WebP is ~86% smaller, which is the difference between a lobby
+ * that paints at once and one that trickles in) —
  * not `/casino/`, which is an SPA route: a real directory there makes nginx
  * answer 403 instead of serving the app. If a file is missing the drawn tile stands in,
  * so a new game code never leaves a hole.
@@ -19,7 +21,7 @@ export function CasinoTile({
   name: string;
   category: string;
 }) {
-  const [src, setSrc] = useState(`/casino-art/${code}.png`);
+  const [src, setSrc] = useState(`/casino-art/${code}.webp`);
 
   return (
     <Link

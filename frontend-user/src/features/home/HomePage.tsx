@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSports } from "@/api/sports";
-import { fetchGames } from "@/api/games";
+import { fetchCasinoGames } from "@/api/casinoLive";
 import { useEvents } from "@/hooks/useEvents";
 import { OddsGrid } from "@/components/exchange/OddsGrid";
 import { SportTabs } from "@/components/exchange/SportTabs";
-import { GameTile } from "@/components/game/GameCard";
+import { CasinoTile } from "@/components/game/CasinoTile";
 import { BetSlip, type BetSelection } from "@/components/bets/BetSlip";
 import { ErrorState } from "@/components/common/States";
 import { useAuthStore } from "@/store/auth";
@@ -19,7 +19,7 @@ export default function HomePage() {
 
   const events = useEvents();
   const sports = useQuery({ queryKey: ["sports"], queryFn: fetchSports });
-  const games = useQuery({ queryKey: ["games", { featured: true }], queryFn: () => fetchGames({ featured: true }) });
+  const casino = useQuery({ queryKey: ["casino-live-games"], queryFn: fetchCasinoGames });
 
   // The feed spans every sport; tabs come from the sport groups actually present.
   const groupOf = useMemo(() => {
@@ -76,10 +76,15 @@ export default function HomePage() {
       </div>
 
       <section className="border border-ex-line bg-white">
-        <h2 className="bg-ex-nav px-3 py-2 text-[13px] font-bold text-white">Our Casino</h2>
-        <div className="grid grid-cols-3 gap-1 p-1 sm:grid-cols-5 lg:grid-cols-8">
-          {games.data?.slice(0, 16).map((g) => (
-            <GameTile key={g.id} game={g} />
+        <h2 className="flex items-center justify-between bg-ex-nav px-3 py-2 text-[13px] font-bold text-white">
+          Our Casino
+          <Link to="/casino" className="text-[12px] font-normal text-white/80 hover:text-white">
+            View all
+          </Link>
+        </h2>
+        <div className="grid grid-cols-3 gap-1 p-1 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
+          {(casino.data ?? []).slice(0, 18).map((g) => (
+            <CasinoTile key={g.code} code={g.code} name={g.name} category={g.category} />
           ))}
         </div>
       </section>
