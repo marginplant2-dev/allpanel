@@ -3,6 +3,9 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { fetchCategories, fetchGames } from "@/api/games";
+import { fetchCasinoGames } from "@/api/casinoLive";
+import { casinoTileArt } from "@/components/game/casinoArt";
+import { Link } from "react-router-dom";
 import { GameTile, GameTileSkeleton } from "@/components/game/GameCard";
 import { ErrorState } from "@/components/common/States";
 import { cn } from "@/lib/utils";
@@ -15,6 +18,13 @@ export default function CasinoPage() {
   const debouncedSearch = useDebounce(search, 300);
 
   const categories = useQuery({ queryKey: ["categories"], queryFn: fetchCategories });
+  // The live tables come straight off the feed, not from our own catalogue.
+  const live = useQuery({ queryKey: ["casino-live-games"], queryFn: fetchCasinoGames });
+  const liveGames = (live.data ?? []).filter(
+    (g) =>
+      (!category || g.category === category) &&
+      (!debouncedSearch || g.name.toLowerCase().includes(debouncedSearch.toLowerCase())),
+  );
   const games = useQuery({
     queryKey: ["games", { category, search: debouncedSearch }],
     queryFn: () => fetchGames({ category, search: debouncedSearch || undefined }),
@@ -59,6 +69,33 @@ export default function CasinoPage() {
           </button>
         ))}
       </div>
+
+      {liveGames.length > 0 && (
+        <section>
+          <h2 className="border-b border-ex-line bg-ex-head px-3 py-1.5 text-[12px] font-bold uppercase text-slate-600">
+            Live Tables
+          </h2>
+          <div className="grid grid-cols-2 gap-1 p-1 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+            {liveGames.map((g) => (
+              <Link
+                key={g.code}
+                to={`/casino/live/${g.code}`}
+                className="group block overflow-hidden border border-ex-line bg-white transition-shadow hover:shadow-md"
+              >
+                <img
+                  src={casinoTileArt(g.name, g.category)}
+                  alt={g.name}
+                  loading="lazy"
+                  className="aspect-[3/2] w-full object-cover"
+                />
+                <p className="truncate bg-ex-brand px-1.5 py-1 text-center text-[11px] font-bold uppercase text-white group-hover:bg-ex-nav">
+                  {g.name}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {games.isError ? (
         <ErrorState onRetry={() => games.refetch()} />

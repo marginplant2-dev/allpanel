@@ -33,18 +33,19 @@ async def lifespan(_: FastAPI):
 
     # Start background workers.
     stop_event = asyncio.Event()
-    from app.workers.settlement import run_bet_settlement
+    from app.workers.settlement import run_bet_settlement, run_casino_settlement
     from app.workers.sync import run_live_ticker
 
     ticker_task = asyncio.create_task(run_live_ticker(stop_event))
     settlement_task = asyncio.create_task(run_bet_settlement(stop_event))
+    casino_task = asyncio.create_task(run_casino_settlement(stop_event))
 
     yield
 
     stop_event.set()
-    for task in (ticker_task, settlement_task):
+    for task in (ticker_task, settlement_task, casino_task):
         task.cancel()
-    for task in (ticker_task, settlement_task):
+    for task in (ticker_task, settlement_task, casino_task):
         try:
             await task
         except asyncio.CancelledError:

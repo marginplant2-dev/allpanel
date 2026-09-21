@@ -14,6 +14,7 @@ const SportsPage = lazy(() => import("@/features/sports/SportsPage"));
 const EventDetailPage = lazy(() => import("@/features/events/EventDetailPage"));
 const CasinoPage = lazy(() => import("@/features/casino/CasinoPage"));
 const GameDetailPage = lazy(() => import("@/features/casino/GameDetailPage"));
+const LiveGamePage = lazy(() => import("@/features/casino/LiveGamePage"));
 const WalletPage = lazy(() => import("@/features/wallet/WalletPage"));
 const CreditHistoryPage = lazy(() => import("@/features/wallet/CreditHistoryPage"));
 const ActivityHistoryPage = lazy(() => import("@/features/wallet/ActivityHistoryPage"));
@@ -46,6 +47,7 @@ export default function App() {
               <Route path="/live" element={<SportsPage liveOnly />} />
               <Route path="/events/:eventId" element={<EventDetailPage />} />
               <Route path="/casino" element={<CasinoPage />} />
+              <Route path="/casino/live/:code" element={<LiveGamePage />} />
               <Route path="/casino/:slug" element={<GameDetailPage />} />
               <Route path="/help" element={<HelpPage />} />
 

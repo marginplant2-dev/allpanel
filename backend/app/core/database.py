@@ -64,6 +64,8 @@ async def ensure_indexes() -> None:
     )
     await db.casino_rounds.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
     await db.casino_sessions.create_index([("user_id", ASCENDING)])
+    await db.casino_bets.create_index([("user_id", ASCENDING), ("placed_at", DESCENDING)])
+    await db.casino_bets.create_index([("status", ASCENDING), ("code", ASCENDING)])
 
     await db.games.create_index([("slug", ASCENDING)], unique=True)
     await db.games.create_index([("category", ASCENDING)])
