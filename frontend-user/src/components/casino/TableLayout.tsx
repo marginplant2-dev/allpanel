@@ -130,12 +130,12 @@ export function MainBets({
             <span className="text-center text-[12px] font-bold uppercase leading-tight text-slate-900 sm:text-[13px]">
               {o.name}
             </span>
-            <span className="text-[15px] font-bold text-slate-900">{o.price.toFixed(2)}</span>
+            <span className="text-[15px] font-bold text-slate-900">{o.price ? o.price.toFixed(2) : "—"}</span>
             <span className="text-[10px] text-slate-600">
               {formatCredits(o.min_stake)} – {formatCredits(o.max_stake)}
             </span>
             {!state.open && (
-              <span className="absolute inset-0 grid place-items-center bg-slate-500/25 text-slate-700">
+              <span className="absolute right-1 top-1 text-slate-600">
                 <Lock />
               </span>
             )}
@@ -188,9 +188,9 @@ export function SideBlock({
                 )}
               >
                 <span className="text-[12px] font-bold text-slate-900">{shortLabel(o, side.name)}</span>
-                <span className="text-[13px] font-bold text-slate-900">{o.price.toFixed(2)}</span>
+                <span className="text-[13px] font-bold text-slate-900">{o.price ? o.price.toFixed(2) : "—"}</span>
                 {!state.open && (
-                  <span className="absolute inset-0 grid place-items-center bg-slate-500/25 text-slate-700">
+                  <span className="absolute right-1 top-1 text-slate-600">
                     <Lock />
                   </span>
                 )}
@@ -210,7 +210,7 @@ export function SideBlock({
                 type="button"
                 disabled={!state.open}
                 onClick={() => onSelect(o)}
-                title={`${o.name} @ ${o.price.toFixed(2)}`}
+                title={`${o.name} @ ${o.price ? o.price.toFixed(2) : "—"}`}
                 className={cn(
                   "relative grid h-12 w-10 place-items-center rounded-sm border border-ex-line",
                   state.open ? "bg-white hover:bg-ex-back3 cursor-pointer" : "bg-slate-300/80 cursor-not-allowed",
@@ -218,9 +218,9 @@ export function SideBlock({
                 )}
               >
                 <span className="text-[14px] font-bold text-slate-900">{shortLabel(o, side.name)}</span>
-                <span className="text-[9px] text-slate-600">{o.price.toFixed(2)}</span>
+                <span className="text-[9px] text-slate-600">{o.price ? o.price.toFixed(2) : "—"}</span>
                 {!state.open && (
-                  <span className="absolute inset-0 grid place-items-center bg-slate-500/25 text-slate-700">
+                  <span className="absolute right-1 top-1 text-slate-600">
                     <Lock />
                   </span>
                 )}
