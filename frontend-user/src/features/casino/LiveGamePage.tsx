@@ -16,6 +16,23 @@ import { cn, formatCredits } from "@/lib/utils";
 
 const QUICK_STAKES = [100, 500, 1000, 2000, 5000, 10000];
 
+/** Result badges read at a glance: the same selection keeps the same colour. */
+const RESULT_TONES = [
+  "bg-red-600",
+  "bg-blue-600",
+  "bg-green-600",
+  "bg-amber-500",
+  "bg-purple-600",
+  "bg-slate-600",
+];
+
+function initials(name: string): string {
+  const words = name.replace(/[^A-Za-z0-9 ]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 1).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
 /** "KCC" -> K♣ ; the feed writes rank + suit letter twice. */
 function cardFace(card: string): { rank: string; suit: string; red: boolean } {
   const suitChar = card.slice(-2, -1).toUpperCase();
@@ -132,9 +149,19 @@ export default function LiveGamePage() {
               )}
             </div>
           ) : (
-            <p className="px-3 py-10 text-center text-sm text-slate-500">
-              This table is not running right now. It opens on its own schedule — try another game.
-            </p>
+            <div className="px-3 py-8 text-center">
+              <p className="text-sm font-semibold text-slate-700">This table is not dealing right now.</p>
+              <p className="mt-1 text-[13px] text-slate-500">
+                The feed marks it closed — these tables open on their own schedule. Its last rounds are
+                below, and betting reopens here the moment it starts.
+              </p>
+              <Link
+                to="/casino"
+                className="mt-3 inline-block bg-ex-brand px-4 py-2 text-[13px] font-bold text-white hover:bg-ex-nav"
+              >
+                Pick a table that is running
+              </Link>
+            </div>
           )}
 
           {t.remark && <p className="border-b border-ex-line bg-yellow-50 px-3 py-1.5 text-[12px] text-slate-700">{t.remark}</p>}
@@ -182,16 +209,28 @@ export default function LiveGamePage() {
           {t.results.length > 0 && (
             <section>
               <h2 className="bg-ex-nav px-3 py-1.5 text-[12px] font-bold uppercase text-white">Last Results</h2>
-              <div className="flex flex-wrap gap-1.5 p-2">
-                {t.results.map((r) => (
-                  <span
-                    key={r.round_id}
-                    title={`Round ${r.round_id}`}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-ex-brand text-[12px] font-bold text-white"
-                  >
-                    {r.winners.join("/") || "-"}
-                  </span>
-                ))}
+              <div className="flex flex-wrap gap-2 p-2">
+                {t.results.map((r) => {
+                  const name = r.winner_names?.[0] || r.winners[0] || "-";
+                  const tone = RESULT_TONES[Number(r.winners[0] ?? 0) % RESULT_TONES.length];
+                  return (
+                    <span
+                      key={r.round_id}
+                      title={`Round ${r.round_id} — ${r.winner_names?.join(", ") || name}`}
+                      className="flex items-center gap-1.5"
+                    >
+                      <span
+                        className={cn(
+                          "grid h-8 w-8 place-items-center rounded-full text-[11px] font-bold text-white",
+                          tone,
+                        )}
+                      >
+                        {initials(name)}
+                      </span>
+                      <span className="hidden text-[11px] text-slate-600 sm:inline">{name}</span>
+                    </span>
+                  );
+                })}
               </div>
             </section>
           )}

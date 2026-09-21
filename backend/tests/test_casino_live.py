@@ -110,3 +110,33 @@ async def test_a_losing_round_keeps_the_stake(db, monkeypatch):
     assert await service.settle_pending() == 1
     assert (await db.casino_bets.find_one({"user_id": uid}))["status"] == BetStatus.LOST.value
     assert (await db.wallets.find_one({"_id": uid}))["available_balance"] == 800.0
+
+
+async def test_results_are_named_from_the_live_tables_own_options(db, monkeypatch):
+    """A result is a bare sid. While the table is live its options name every sid,
+    and those names are remembered so a closed table still reads "Player A"."""
+    service = await _table(db, monkeypatch)
+    monkeypatch.setattr(
+        live, "fetch_results", lambda code: _async([{"round_id": "1", "winners": ["1"]}])
+    )
+
+    t = await service.table("TEEN_20")
+    assert t["results"][0]["winner_names"] == ["Player A"]
+
+    # the table goes dark: no options, but the learned labels survive
+    monkeypatch.setattr(live, "fetch_table", lambda code: _async(map_table(code, {})))
+    closed = await service.table("TEEN_20")
+    assert closed["live"] is False
+    assert closed["results"][0]["winner_names"] == ["Player A"]
+
+
+async def test_a_table_never_seen_live_still_names_its_winners(db, monkeypatch):
+    """Dragon Tiger 1 Day runs once a day; its results should not read "1" and "2"
+    just because we have not caught it dealing yet."""
+    monkeypatch.setattr(live, "fetch_table", lambda code: _async(map_table(code, {})))
+    monkeypatch.setattr(
+        live, "fetch_results", lambda code: _async([{"round_id": "9", "winners": ["2"]}])
+    )
+    service = live.CasinoLiveService(db)
+    t = await service.table("DRAGON_TIGER_6")
+    assert t["results"][0]["winner_names"] == ["Tiger"]

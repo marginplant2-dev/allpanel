@@ -23,6 +23,8 @@ export interface CasinoOption {
 export interface CasinoResult {
   round_id: string;
   winners: string[];
+  /** The winning selection's name, when the table has told us what that sid is. */
+  winner_names: string[];
 }
 
 export interface CasinoTable {
@@ -39,6 +41,8 @@ export interface CasinoTable {
   options: CasinoOption[];
   live: boolean;
   results: CasinoResult[];
+  /** sid -> selection name for this table. */
+  labels: Record<string, string>;
 }
 
 export interface CasinoBet {

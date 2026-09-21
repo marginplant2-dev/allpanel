@@ -65,6 +65,42 @@ CASINO_GAMES: dict[str, tuple[str, str]] = {
     "WORLI2": ("Instant Worli", "worli"),
 }
 
+#: Results come back as a bare sid ("2"). While a table is live its own options
+#: name every sid, and those get remembered; this covers the gap before a table
+#: has been seen running.
+FALLBACK_LABELS: dict[str, dict[str, str]] = {
+    "dt20": {"1": "Dragon", "2": "Tiger", "3": "Tie"},
+    "dt202": {"1": "Dragon", "2": "Tiger", "3": "Tie"},
+    "dt6": {"1": "Dragon", "2": "Tiger", "3": "Tie"},
+    "dtl20": {"1": "Dragon", "2": "Tiger", "3": "Lion"},
+    "teen20": {"1": "Player A", "2": "Player B"},
+    "teen": {"1": "Player A", "2": "Player B"},
+    "teen9": {"1": "Player A", "2": "Player B"},
+    "teen8": {"1": "Player A", "2": "Player B"},
+    "ab20": {"1": "Andar", "2": "Bahar"},
+    "abj": {"1": "Andar", "2": "Bahar"},
+    "aaa": {"1": "Amar", "2": "Akbar", "3": "Anthony"},
+    "lucky7": {"1": "Low", "2": "High", "3": "Tie"},
+    "lucky7eu": {"1": "Low", "2": "High", "3": "Tie"},
+    "baccarat": {"1": "Player", "2": "Banker", "3": "Tie"},
+    "baccarat2": {"1": "Player", "2": "Banker", "3": "Tie"},
+}
+
+#: code -> gtype, so a closed table can still reach its fallback labels.
+CODE_GTYPE: dict[str, str] = {
+    "TEEN_20": "teen20", "TEEN": "teen", "TEEN_9": "teen9", "TEEN_8": "teen8",
+    "AB_20": "ab20", "ABJ": "abj", "AAA": "aaa",
+    "DRAGON_TIGER_20": "dt20", "DRAGON_TIGER_20_2": "dt202", "DRAGON_TIGER_6": "dt6",
+    "DRAGON_TIGER_LION_20": "dtl20",
+    "LUCKY7": "lucky7", "LUCKY7EU": "lucky7eu",
+    "BACCARAT": "baccarat", "BACCARAT2": "baccarat2",
+}
+
+
+def fallback_labels(code: str) -> dict[str, str]:
+    return FALLBACK_LABELS.get(CODE_GTYPE.get(code, ""), {})
+
+
 _cache: dict[str, tuple[float, Any]] = {}
 _client: httpx.AsyncClient | None = None
 

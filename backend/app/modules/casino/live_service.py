@@ -15,7 +15,12 @@ from pymongo.errors import DuplicateKeyError
 from app.core.dependencies import CurrentUser
 from app.core.enums import BetStatus
 from app.modules.ledger.service import InsufficientFundsError
-from app.modules.providers.proexch_casino import CASINO_GAMES, fetch_results, fetch_table
+from app.modules.providers.proexch_casino import (
+    CASINO_GAMES,
+    fallback_labels,
+    fetch_results,
+    fetch_table,
+)
 from app.modules.wallet.repository import WalletRepository
 from app.core.exceptions import NotFoundError, ValidationError
 from app.utils.ids import to_object_id
@@ -44,8 +49,32 @@ class CasinoLiveService:
         if code not in CASINO_GAMES:
             raise NotFoundError("Unknown casino game")
         table = await fetch_table(code)
-        table["results"] = await fetch_results(code)
+        labels = await self._labels(code, table["options"])
+        table["labels"] = labels
+        table["results"] = [
+            {**r, "winner_names": [labels.get(w, w) for w in r["winners"]]}
+            for r in await fetch_results(code)
+        ]
         return table
+
+    async def _labels(self, code: str, options: list[dict[str, Any]]) -> dict[str, str]:
+        """sid -> selection name.
+
+        A result is just a sid, so the name has to come from somewhere. While the
+        table is live its own options name every sid, and those are remembered so a
+        closed table can still show "Dragon" instead of "1".
+        """
+        if options:
+            learned = {str(o["sid"]): o["name"] for o in options if o.get("name")}
+            if learned:
+                await self.db.casino_labels.update_one(
+                    {"_id": code},
+                    {"$set": {"labels": learned, "updated_at": utcnow()}},
+                    upsert=True,
+                )
+                return learned
+        stored = await self.db.casino_labels.find_one({"_id": code})
+        return (stored or {}).get("labels") or fallback_labels(code)
 
     async def my_bets(
         self, user_id: str, *, code: str | None = None, skip: int = 0, limit: int = 20
