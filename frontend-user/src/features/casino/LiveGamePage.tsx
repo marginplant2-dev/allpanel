@@ -115,7 +115,18 @@ export default function LiveGamePage() {
 
         <div className="border border-ex-line bg-white">
           <div className="flex items-center justify-between gap-2 bg-ex-brand px-3 py-2 text-white">
-            <h1 className="truncate text-[15px] font-bold uppercase">{t.name}</h1>
+            <span className="flex min-w-0 items-center gap-2">
+              <img
+                src={`/casino/${t.code}.png`}
+                alt=""
+                aria-hidden
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+                className="hidden h-8 w-5 rounded-sm object-cover sm:block"
+              />
+              <h1 className="truncate text-[15px] font-bold uppercase">{t.name}</h1>
+            </span>
             <span className="shrink-0 text-[12px]">
               {t.live ? `Round ID: ${t.round_id}` : "Table closed"}
             </span>

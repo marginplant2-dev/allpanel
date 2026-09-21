@@ -4,8 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { fetchCategories, fetchGames } from "@/api/games";
 import { fetchCasinoGames } from "@/api/casinoLive";
-import { casinoTileArt } from "@/components/game/casinoArt";
-import { Link } from "react-router-dom";
+import { CasinoTile } from "@/components/game/CasinoTile";
 import { GameTile, GameTileSkeleton } from "@/components/game/GameCard";
 import { ErrorState } from "@/components/common/States";
 import { cn } from "@/lib/utils";
@@ -75,23 +74,9 @@ export default function CasinoPage() {
           <h2 className="border-b border-ex-line bg-ex-head px-3 py-1.5 text-[12px] font-bold uppercase text-slate-600">
             Live Tables
           </h2>
-          <div className="grid grid-cols-2 gap-1 p-1 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+          <div className="grid grid-cols-3 gap-1 p-1 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
             {liveGames.map((g) => (
-              <Link
-                key={g.code}
-                to={`/casino/live/${g.code}`}
-                className="group block overflow-hidden border border-ex-line bg-white transition-shadow hover:shadow-md"
-              >
-                <img
-                  src={casinoTileArt(g.name, g.category)}
-                  alt={g.name}
-                  loading="lazy"
-                  className="aspect-[3/2] w-full object-cover"
-                />
-                <p className="truncate bg-ex-brand px-1.5 py-1 text-center text-[11px] font-bold uppercase text-white group-hover:bg-ex-nav">
-                  {g.name}
-                </p>
-              </Link>
+              <CasinoTile key={g.code} code={g.code} name={g.name} category={g.category} />
             ))}
           </div>
         </section>
