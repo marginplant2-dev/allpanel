@@ -13,6 +13,11 @@ import { cn } from "@/lib/utils";
  */
 const LAY_SPREAD = 0.02;
 
+/** Long odds drop their pennies: "140" fits a phone cell, "140.00" does not. */
+export function formatPrice(price: number) {
+  return price >= 100 ? price.toFixed(0) : price.toFixed(2);
+}
+
 export function layPrice(price: number) {
   return Math.round(price * (1 + LAY_SPREAD) * 100) / 100;
 }
@@ -59,7 +64,7 @@ function PriceCell({
         clickable ? "cursor-pointer hover:brightness-105 active:brightness-95" : "cursor-default",
       )}
     >
-      {price === null ? "-" : price.toFixed(2)}
+      {price === null ? "-" : formatPrice(price)}
     </button>
   );
 }

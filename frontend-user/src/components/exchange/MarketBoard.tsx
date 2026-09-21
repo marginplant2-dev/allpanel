@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import type { Bookmaker, OddsOutcome, PriceLevel } from "@/types";
 import type { BetSelection } from "@/components/bets/BetSlip";
+import { formatPrice } from "@/components/exchange/OddsGrid";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,7 +43,7 @@ function Cell({
       )}
     >
       <span className="text-[13px] font-bold text-slate-900">
-        {level?.price ? level.price.toFixed(2) : "-"}
+        {level?.price ? formatPrice(level.price) : "-"}
       </span>
       {level?.size ? <span className="text-[10px] text-slate-600">{level.size}</span> : null}
     </button>

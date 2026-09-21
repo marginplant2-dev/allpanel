@@ -20,7 +20,7 @@ function Panel({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between bg-ex-nav px-2.5 py-2 text-[13px] font-bold text-white"
+        className="ex-sec w-full px-2.5 py-2"
       >
         {title}
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -44,7 +44,9 @@ function Item({ to, label, active }: { to: string; label: string; active?: boole
   );
 }
 
-export function Sidebar() {
+/** `collapsed` starts every panel shut — the mobile copy, where the sports tree
+ *  would otherwise push the board off the screen. */
+export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const [params] = useSearchParams();
   const activeSport = params.get("sport");
   const activeGroup = params.get("group");
@@ -68,19 +70,19 @@ export function Sidebar() {
 
   return (
     <aside className="w-full shrink-0 lg:w-[230px]">
-      <Panel title="Racing Sports">
+      <Panel title="Racing Sports" defaultOpen={!collapsed}>
         <Item to="/sports?group=Horse Racing" label="Horse Racing" active={activeGroup === "Horse Racing"} />
         <Item to="/sports?group=Greyhound Racing" label="Greyhound Racing" active={activeGroup === "Greyhound Racing"} />
       </Panel>
 
-      <Panel title="Others">
+      <Panel title="Others" defaultOpen={!collapsed}>
         <Item to="/casino" label="Our Casino" />
         <Item to="/casino?category=live" label="Live Casino" />
         <Item to="/casino?category=slots" label="Slot Game" />
         <Item to="/casino?category=table" label="Table Games" />
       </Panel>
 
-      <Panel title="All Sports">
+      <Panel title="All Sports" defaultOpen={!collapsed}>
         {sports.isLoading && <p className="px-3 py-2 text-[13px] text-slate-500">Loading…</p>}
         {groups.map(([group, list]) => {
           const open = expanded.includes(group);

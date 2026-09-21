@@ -52,7 +52,7 @@ export default function SportsPage({ liveOnly = false }: { liveOnly?: boolean })
     <div className="space-y-3">
       {/* the sidebar tree is the primary sport picker on mobile, where it is hidden from the shell */}
       <div className="lg:hidden">
-        <Sidebar />
+        <Sidebar collapsed />
       </div>
 
       <div>
